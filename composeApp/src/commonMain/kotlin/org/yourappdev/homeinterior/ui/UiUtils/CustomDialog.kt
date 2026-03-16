@@ -99,7 +99,7 @@ fun DeleteConfirmationDialog(
                     modifier = Modifier.weight(1f).background(Color.Transparent, RoundedCornerShape(50))
                         .border(1.dp, Color(0xffE1DDDD), shape = RoundedCornerShape(50))
                         .clip(RoundedCornerShape(50)).clickable(enabled = true, onClick = {
-
+                            onCancel()
                         }), contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -112,7 +112,8 @@ fun DeleteConfirmationDialog(
                 }
                 Button(
                     onClick = {
-
+                        println("🔴 DELETE BUTTON CLICKED!")
+                        onConfirm()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xffDC3545)),
                     shape = RoundedCornerShape(50),

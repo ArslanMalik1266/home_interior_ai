@@ -40,7 +40,7 @@ import org.yourappdev.homeinterior.ui.CreateAndExplore.RoomsViewModel
 fun FilesScreen(
     viewModel: RoomsViewModel = koinViewModel(),
     navController: androidx.navigation.NavController,
-    onImageClick: () -> Unit,
+    onImageClick: (Long) -> Unit,
     onShowResults: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
@@ -138,6 +138,9 @@ fun FilesScreen(
                         onBundleClick = { bundleUrls ->
                             viewModel.onRoomEvent(RoomEvent.ShowSelectedBundle(bundleUrls))
                             onShowResults()
+                        },
+                        onImageClick = { entity ->
+                            onImageClick(entity.id)  // ✅ ID pass karo
                         }
                     )
                 }

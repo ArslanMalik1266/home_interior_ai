@@ -229,8 +229,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                         showGallery = true
                     },
                     onRoomClick = { room ->
-                        navController.navigate(Routes.FileEdit(imageUrl = room.imageUrl))
-                    },
+                        navController.navigate(Routes.FileEdit(imageUrl = room.imageUrl, entityId = room.id.toLong()))                    },
                     onShowResults = {
                         navController.navigate(Routes.Result)
                     },
@@ -260,8 +259,10 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                 FilesScreen(
                     viewModel = roomViewModel,
                     navController = navController,
-                    onImageClick = {
-                        navController.navigate(Routes.FileEdit)
+                    onImageClick = { entityId ->
+                        navController.navigate(
+                            Routes.FileEdit(entityId = entityId)
+                        )
                     },
                     onShowResults = {
                         navController.navigate(Routes.Result)
@@ -299,16 +300,25 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
 
                 val args = backStackEntry.toRoute<Routes.FileEdit>()
                 val state by roomViewModel.state.collectAsState()
+                println("DEBUG_FILEEDIT: entityId from args = ${args.entityId}")
+                println("DEBUG_FILEEDIT: all entity IDs = ${state.generatedImagesEntity.map { it.id }}")
+
                 val imageBytes = if (args.imageIndex >= 0) {
                     state.generatedImagesEntity.getOrNull(args.imageIndex) ?.imageBytes ?: byteArrayOf() // ✅ index se ByteArray lo
                 } else {
                     byteArrayOf()
                 }
+                val entity = state.generatedImagesEntity
+                    .find { it.id == args.entityId }
+                println("DEBUG_FILEEDIT: found entity = $entity")
+
 
                 CreateEditScreen(
                     imageUrlString = args.imageUrl,
                     imageUrl = imageBytes,
-                    onClick = { navController.popBackStack() }
+                    onClick = { navController.popBackStack()},
+                    viewModel = roomViewModel,
+                    entity = entity
                 )
             }
 

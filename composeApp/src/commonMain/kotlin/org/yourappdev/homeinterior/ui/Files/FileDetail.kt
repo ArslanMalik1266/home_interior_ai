@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,8 @@ import homeinterior.composeapp.generated.resources.sofa_3
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
+import org.yourappdev.homeinterior.ui.CreateAndExplore.RoomsViewModel
 import org.yourappdev.homeinterior.ui.UiUtils.CloseIconButton
 import org.yourappdev.homeinterior.ui.UiUtils.DeleteConfirmationDialog
 
@@ -47,7 +50,9 @@ import org.yourappdev.homeinterior.ui.UiUtils.DeleteConfirmationDialog
 @Composable
 fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                       imageUrlString: String = "",
-                      onClick: () -> Unit) {
+                      onClick: () -> Unit,
+                      viewModel: RoomsViewModel? = null,
+                      entity: RecentGeneratedEntity? = null) {
     val scope = rememberCoroutineScope()
     val backgroundColor = Color(0xFFFFFFFF)
     val darkText = Color(0xFF2C2C2C)
@@ -155,18 +160,39 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
             ModalBottomSheet(
                 onDismissRequest = { showDelete = false },
                 sheetState = bottomSheetState,
-                containerColor = Color.Transparent,
-                dragHandle = null, modifier = Modifier.statusBarsPadding()
+                containerColor = Color.White, // Use White for visibility while testing
+                dragHandle = { BottomSheetDefaults.DragHandle() }, // Optional: adding drag handle
+                modifier = Modifier.statusBarsPadding()
             ) {
-                DeleteConfirmationDialog(title = "Are you sure you want to delete files?") {
-                    scope.launch {
-                        bottomSheetState.hide()
+                DeleteConfirmationDialog(
+                    title = "Are you sure you want to delete this image?",
+                    onConfirm = {
+                        println("🟡 PROCESS: Starting Delete for ID: ${entity?.id}")
+                        showDelete = false // Foran sheet band karein
+
+                        scope.launch {
+                            try {
+                                // Null safety check
+                                if (viewModel != null && entity != null) {
+                                    viewModel.deleteRecentImage(entity.id) {
+                                        println("🟢 PROCESS: Delete Success, closing screen.")
+                                        onClick() // Screen band karke piche chale jayein
+                                    }
+                                } else {
+                                    println("❌ ERROR: ViewModel or Entity is NULL")
+                                }
+                            } catch (e: Exception) {
+                                println("❌ ERROR: Coroutine Failed: ${e.message}")
+                            }
+                        }
+                    },
+                    onCancel = {
+                        println("🔵 PROCESS: User cancelled delete")
                         showDelete = false
                     }
-                }
+                )
             }
-        }
-    }
+        }    }
 }
 
 @Composable

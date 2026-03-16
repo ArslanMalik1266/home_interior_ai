@@ -50,7 +50,6 @@ class RoomsViewModel(
     private val fetchGeneratedRoomUseCase: FetchGeneratedRoomUseCase,
     private val httpClient: io.ktor.client.HttpClient,
 ) : ViewModel() {
-
     private val _state = MutableStateFlow(RoomUiState())
     val state: StateFlow<RoomUiState> = _state.asStateFlow()
 
@@ -65,9 +64,6 @@ class RoomsViewModel(
             initialValue = emptyList()
         )
     private var currentDraftId: Long? = null
-
-
-
     fun selectDraftImage(draft: DraftEntity) {
         currentDraftId = draft.id
 
@@ -87,7 +83,6 @@ class RoomsViewModel(
             )
         }
     }
-
     val dbGeneratedImages: StateFlow<List<RecentGeneratedEntity>> =
         recentGeneratedRepository.getRecentGenerated()
             .stateIn(
@@ -95,7 +90,6 @@ class RoomsViewModel(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = emptyList()
             )
-
     @OptIn(ExperimentalTime::class)
     fun saveOrUpdateDraft() {
         val currentState = _state.value
@@ -133,7 +127,6 @@ class RoomsViewModel(
             )
         }
     }
-
 
     fun onGeneratedImageClick(imageUrl: String) {
         _selectedGeneratedImage.value = imageUrl
@@ -271,8 +264,6 @@ class RoomsViewModel(
                     )
                 }
             }
-
-            // Image selection event
             is RoomEvent.SetImage -> {
                 _state.value = _state.value.copy(
                     selectedImage = event.imageDetails.uri
@@ -484,7 +475,6 @@ class RoomsViewModel(
                     )
                 }
             }
-
             is RoomEvent.ShowSelectedBundle -> {
                 _state.update {
                     it.copy(
@@ -497,7 +487,6 @@ class RoomsViewModel(
             else -> {}
         }
     }
-
     private fun applyFiltersAndSearch() {
         val state = _state.value
         var filtered = state.allRooms
@@ -541,7 +530,6 @@ class RoomsViewModel(
 
         _state.value = _state.value.copy(filteredRooms = filtered)
     }
-
     private fun calculateFilterCount(filterState: FilterState): Int {
         var count = 0
         if (filterState.selectedRoomTypes.isNotEmpty() && !filterState.selectedRoomTypes.contains("All")) count++
@@ -551,7 +539,6 @@ class RoomsViewModel(
         if (filterState.selectedPrices.isNotEmpty()) count++
         return count
     }
-
     private fun extractDynamicFilters(rooms: List<org.yourappdev.homeinterior.domain.model.RoomUi>) {
         val roomTypes = rooms.map { it.roomType }.filter { it.isNotBlank() }.distinct()
 
@@ -571,7 +558,6 @@ class RoomsViewModel(
             selectedPaletteId = _state.value.selectedPaletteId ?: colorPalettes.firstOrNull()?.id
         )
     }
-
     fun getRooms() {
         println("DEBUG_VM: 1. getRooms() called") // Check if called
         viewModelScope.launch {
@@ -712,4 +698,19 @@ class RoomsViewModel(
             else -> onRoomEvent(event) // Purane events ko bhej dein
         }
     }
+    // RoomsViewModel.kt
+    fun deleteRecentImage(id: Long, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            println("DEBUG_VM: Attempting to delete image with ID: $id")
+            try {
+                recentGeneratedRepository.deleteGeneratedById(id)
+                println("🗑️ DELETE: ID $id removed from DB")
+                _uiEvent.emit(CommonUiEvent.ShowError("Deleted successfully"))
+                onDeleted() // Ye callback UI ko band karne ke liye hai
+            } catch (e: Exception) {
+                _uiEvent.emit(CommonUiEvent.ShowError("Delete failed"))
+            }
+        }
+    }
+
 }
