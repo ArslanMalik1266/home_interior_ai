@@ -32,6 +32,7 @@ import org.yourappdev.homeinterior.ui.authentication.AuthViewModel
 import org.yourappdev.homeinterior.ui.authentication.register.RegisterEvent
 import org.yourappdev.homeinterior.ui.common.base.CommonUiEvent
 import org.yourappdev.homeinterior.ui.common.base.CommonUiEvent.ShowError
+import org.yourappdev.homeinterior.utils.downloadAndCacheImage
 import org.yourappdev.homeinterior.utils.executeApiCall
 import org.yourappdev.homeinterior.utils.getDeviceId
 import org.yourappdev.homeinterior.utils.toBase64
@@ -150,9 +151,7 @@ class RoomsViewModel(
                         println("🟢 FETCH_FLOW: [$index] -----------------")
                         println("🟢 FETCH_FLOW:   - ID = ${entity.id}")
                         println("🟢 FETCH_FLOW:   - URL = ${entity.imageUrl}")
-                        println("🟢 FETCH_FLOW:   - Bytes size = ${entity.imageBytes.size}")
                         println("🟢 FETCH_FLOW:   - Created at = ${entity.createdAt}")
-                        println("🟢 FETCH_FLOW:   - First 10 bytes = ${entity.imageBytes.take(10).toList()}")
                     }
                 }
             }
@@ -375,15 +374,27 @@ class RoomsViewModel(
                                     var retries = 0
 
                                     while (fetchResult is ResultState.Success &&
-                                        fetchResult.data.isProcessing && retries < 5) {
-                                        println("DEBUG_VM: Retry ${retries + 1}...")
-                                        kotlinx.coroutines.delay(10_000L)
+                                        fetchResult.data.isProcessing && retries < 15) {
+                                        println("DEBUG_VM: Retry ${retries + 1}... still processing")
+                                        kotlinx.coroutines.delay(15_000L)  // ✅ 15 sec
                                         fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
                                         retries++
                                     }
 
-                                    if (fetchResult is ResultState.Success) fetchResult.data
-                                    else response
+                                    if (fetchResult is ResultState.Success) {
+                                        val final = fetchResult.data
+                                        println("DEBUG_VM: Final status = ${final.status}")
+                                        println("DEBUG_VM: Final images = ${final.availableImages.size}")
+
+                                        if (final.availableImages.isEmpty()) {
+                                            println("❌ No images after retries!")
+                                            _state.update { it.copy(isGenerating = false, errorMessage = "Generation timeout") }
+                                            return@launch
+                                        }
+                                        final  // ✅ Return final
+                                    } else {
+                                        response
+                                    }
                                 } else {
                                     response
                                 }
@@ -393,11 +404,17 @@ class RoomsViewModel(
 
                                 if (finalResponse.isSuccess) {
                                     val images = finalResponse.availableImages
-                                    val decodedImages = images.map { url ->
-                                        val response = httpClient.get(url)
-                                        val base64String = response.bodyAsText()
-                                        Base64.decode(base64String)
+                                    val localPaths = images.map { url ->
+                                        downloadAndCacheImage(
+                                            url = url,
+                                            fileName = "interior_${kotlin.time.Clock.System.now().toEpochMilliseconds()}.jpg"
+                                        )
+
                                     }
+                                    localPaths.forEachIndexed { index, path ->
+                                        println("🔵 LOCAL_PATH[$index] = $path")
+                                    }
+
                                     val response = httpClient.get(images[0])
                                     println("DEBUG_VM: Content-Type = ${response.headers["Content-Type"]}")
                                     println("DEBUG_VM: Body first 100 chars = ${response.bodyAsText().take(100)}")
@@ -405,19 +422,13 @@ class RoomsViewModel(
                                         println("DEBUG_VM: Image[$index] URL = $url")
                                     }
 
-                                    images.forEachIndexed  { index, url ->
-                                        println("🔵 SAVE_FLOW: Saving image[$index] to database...")
-                                        println("🔵 SAVE_FLOW: - URL = $url")
-                                        println("🔵 SAVE_FLOW: - Bytes size = ${decodedImages.getOrNull(index)?.size ?: 0}")
-
+                                    images.forEachIndexed { index, url ->
                                         recentGeneratedRepository.saveGenerated(
                                             RecentGeneratedEntity(
-                                                imageBytes = decodedImages.getOrNull(index) ?: byteArrayOf(),
                                                 imageUrl = url,
-                                                createdAt = kotlin.time.Clock.System.now().toEpochMilliseconds()
+                                                localPath = localPaths.getOrNull(index) // ✅ Local path
                                             )
                                         )
-                                        println("🔵 SAVE_FLOW: Image[$index] saved to database ✅")
                                     }
                                     println("🔵 SAVE_FLOW: All ${images.size} images saved to database")
 
@@ -425,15 +436,14 @@ class RoomsViewModel(
                                         it.copy(
                                             isGenerating = false,
                                             generatedImages = images,
-                                            decodedImageBytes = decodedImages,
+                                            decodedImageBytes = emptyList(),
                                             generatedCount = images.size,
                                             jobId = finalResponse.id?.toString(),
                                             generatedRoom = null,
                                             generatedImagesEntity = images.mapIndexed { index, url ->
                                                 RecentGeneratedEntity(
-                                                    imageBytes = decodedImages.getOrNull(index) ?: byteArrayOf(),
                                                     imageUrl = url,
-                                                    createdAt = kotlin.time.Clock.System.now().toEpochMilliseconds()
+                                                    localPath = localPaths.getOrNull(index)
                                                 )
                                             }
                                         )

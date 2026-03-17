@@ -331,26 +331,17 @@ private fun RecentFilesRow(
                 ) {
                     if (bundle.isNotEmpty()) {
                         val firstImage = bundle[0]
-                        if (firstImage.imageBytes.isNotEmpty()) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalPlatformContext.current)
-                                    .data(firstImage.imageBytes)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                                placeholder = painterResource(Res.drawable.roomplaceholder),
-                                error = painterResource(Res.drawable.roomplaceholder)
-                            )
-                        } else {
-                            Image(
-                                painter = painterResource(Res.drawable.roomplaceholder),
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalPlatformContext.current)
+                                .data(firstImage.localPath ?: firstImage.imageUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                            placeholder = painterResource(Res.drawable.roomplaceholder),
+                            error = painterResource(Res.drawable.roomplaceholder)
+                        )
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)

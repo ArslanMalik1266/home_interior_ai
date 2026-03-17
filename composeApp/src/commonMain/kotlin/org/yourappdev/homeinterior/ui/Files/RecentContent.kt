@@ -77,7 +77,7 @@ fun RecentContent(
                     if (bundle.isNotEmpty()) {
                         println("DEBUG: Loading image = ${bundle[0]}")
                         AsyncImage(
-                            model = bundle[0].imageBytes,
+                            model = bundle[0].localPath ?: bundle[0].imageUrl,
                             contentDescription = "Generated Interior",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,

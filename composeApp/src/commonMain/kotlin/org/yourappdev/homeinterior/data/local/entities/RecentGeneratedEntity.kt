@@ -8,7 +8,7 @@ import kotlin.time.ExperimentalTime
 @Entity(tableName = "recent_generated")
 data class RecentGeneratedEntity @OptIn(ExperimentalTime::class) constructor(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val imageBytes: ByteArray,
+    val localPath: String? = null,
     val imageUrl: String,
     val createdAt: Long = Clock.System.now().toEpochMilliseconds()
 )

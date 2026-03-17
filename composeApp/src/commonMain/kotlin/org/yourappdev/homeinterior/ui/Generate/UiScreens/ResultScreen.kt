@@ -79,8 +79,7 @@ private fun CreateContent(imageList: List<RecentGeneratedEntity>,
             }
         ) { index, entity ->
             ImageCard(
-                imageBytes = entity.imageBytes.takeIf { it.isNotEmpty() },
-                imageUrl = entity.imageUrl.ifBlank { null },
+                imageUrl = entity.localPath ?: entity.imageUrl.ifBlank { null },
                 isLarge = (index + 1) % 3 == 0,
                 modifier = Modifier.clickable { onImageClick(index) }
             )
@@ -96,7 +95,7 @@ private fun ImageCard(
     modifier: Modifier = Modifier
 ) {
     AsyncImage(
-        model = imageBytes ?: imageUrl,
+        model = imageUrl,
         contentDescription = "Room design",
         onError = { error ->
             println("DEBUG_IMAGE: Error = ${error.result.throwable.message}")

@@ -45,8 +45,12 @@ import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
 import org.yourappdev.homeinterior.ui.CreateAndExplore.RoomsViewModel
 import org.yourappdev.homeinterior.ui.UiUtils.CloseIconButton
 import org.yourappdev.homeinterior.ui.UiUtils.DeleteConfirmationDialog
+import org.yourappdev.homeinterior.utils.saveImageToGallery
+import org.yourappdev.homeinterior.utils.shareImage
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalTime::class)
 @Composable
 fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                       imageUrlString: String = "",
@@ -54,6 +58,13 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                       viewModel: RoomsViewModel? = null,
                       entity: RecentGeneratedEntity? = null) {
     val scope = rememberCoroutineScope()
+    var saveSuccess by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(saveSuccess) {
+        if (saveSuccess != null) {
+            kotlinx.coroutines.delay(2000)
+            saveSuccess = null
+        }
+    }
     val backgroundColor = Color(0xFFFFFFFF)
     val darkText = Color(0xFF2C2C2C)
     val grayText = Color(0xFF9B9B9B)
@@ -129,6 +140,15 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                     iconTint = grayText,
                     modifier = Modifier.weight(1f)
                 ) {
+                    scope.launch {
+                        val success = saveImageToGallery(
+                            imageBytes = if (imageUrl.isNotEmpty()) imageUrl else null,
+                            imageUrl = if (imageUrlString.isNotEmpty()) imageUrlString else null,
+                            fileName = "interior_${Clock.System.now().toEpochMilliseconds()}.jpg"
+                        )
+                        saveSuccess = success
+                        println(if (success) "✅ Saved!" else "❌ Save failed")
+                    }
 
                 }
 
@@ -152,8 +172,37 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                     hasBorder = true,
                     borderColor = borderColor,
                     modifier = Modifier.weight(1f)
-                ) {}
+                ) {
+                    scope.launch {
+                        shareImage(
+                            imageBytes = if (imageUrl.isNotEmpty()) imageUrl else null,
+                            imageUrl = if (imageUrlString.isNotEmpty()) imageUrlString else null,
+                            fileName = "interior_design.jpg"
+                        )
+                    }
 
+                }
+
+            }
+            saveSuccess?.let { success ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (success) Color(0xFF4CAF50) else Color(0xFFDC3545)
+                        )
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (success) "✅ Image saved to gallery!" else "❌ Save failed!",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
         if (showDelete) {
@@ -175,7 +224,6 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                                 // Null safety check
                                 if (viewModel != null && entity != null) {
                                     viewModel.deleteRecentImage(entity.id) {
-                                        println("🟢 PROCESS: Delete Success, closing screen.")
                                         onClick() // Screen band karke piche chale jayein
                                     }
                                 } else {
@@ -274,7 +322,9 @@ fun ImageSection(
             .background(Color(0xFFF5F5F5))
     ) {
         AsyncImage(
-            model =  if (imageUrl.isNotEmpty()) imageUrl else imageUrlString,
+            model = if (imageUrl.isNotEmpty()) imageUrl
+            else if (imageUrlString.isNotEmpty()) imageUrlString
+            else null,
             contentDescription = "Editing Image",
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize()

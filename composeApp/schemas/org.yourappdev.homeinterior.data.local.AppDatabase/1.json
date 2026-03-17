@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "39649b0ef6266780a5d19b78df493224",
+    "identityHash": "d9cc961507cacd5d12ac98f8198b3baa",
     "entities": [
       {
         "tableName": "drafts",
@@ -59,7 +59,7 @@
       },
       {
         "tableName": "recent_generated",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `imageBytes` BLOB NOT NULL, `imageUrl` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `localPath` TEXT, `imageUrl` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -68,10 +68,9 @@
             "notNull": true
           },
           {
-            "fieldPath": "imageBytes",
-            "columnName": "imageBytes",
-            "affinity": "BLOB",
-            "notNull": true
+            "fieldPath": "localPath",
+            "columnName": "localPath",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "imageUrl",
@@ -96,7 +95,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '39649b0ef6266780a5d19b78df493224')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd9cc961507cacd5d12ac98f8198b3baa')"
     ]
   }
 }

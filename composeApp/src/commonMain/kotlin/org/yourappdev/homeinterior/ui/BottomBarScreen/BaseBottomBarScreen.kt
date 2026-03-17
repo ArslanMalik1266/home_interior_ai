@@ -3,6 +3,7 @@ package org.yourappdev.homeinterior.ui.BottomBarScreen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -11,11 +12,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +45,7 @@ import io.github.ismoy.imagepickerkmp.presentation.ui.components.GalleryPickerLa
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
 import org.yourappdev.homeinterior.navigation.Routes
 import org.yourappdev.homeinterior.ui.Account.AccountScreen
 import org.yourappdev.homeinterior.ui.Account.ProfileScreen
@@ -74,6 +79,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
     var showGallery by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+
 
     val platformContext = getPlatformContext()
 
@@ -297,31 +303,57 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
             }
 
             composable<Routes.FileEdit> { backStackEntry ->
-
                 val args = backStackEntry.toRoute<Routes.FileEdit>()
+                val dbImages by roomViewModel.dbGeneratedImages.collectAsState()
                 val state by roomViewModel.state.collectAsState()
-                println("DEBUG_FILEEDIT: entityId from args = ${args.entityId}")
-                println("DEBUG_FILEEDIT: all entity IDs = ${state.generatedImagesEntity.map { it.id }}")
 
-                val imageBytes = if (args.imageIndex >= 0) {
-                    state.generatedImagesEntity.getOrNull(args.imageIndex) ?.imageBytes ?: byteArrayOf() // ✅ index se ByteArray lo
-                } else {
-                    byteArrayOf()
+
+                val entity = remember(args, dbImages, state) {
+                    when {
+                        args.imageIndex >= 0 -> state.generatedImagesEntity.getOrNull(args.imageIndex)
+                        args.entityId != -1L -> dbImages.find { it.id == args.entityId }
+                        args.imageUrl.isNotEmpty() -> dbImages.find { it.imageUrl == args.imageUrl }
+                        else -> null
+                    }
                 }
-                val entity = state.generatedImagesEntity
-                    .find { it.id == args.entityId }
-                println("DEBUG_FILEEDIT: found entity = $entity")
 
-
-                CreateEditScreen(
-                    imageUrlString = args.imageUrl,
-                    imageUrl = imageBytes,
-                    onClick = { navController.popBackStack()},
-                    viewModel = roomViewModel,
-                    entity = entity
-                )
+                when {
+                    entity != null -> {
+                        CreateEditScreen(
+                            entity = entity,
+                            viewModel = roomViewModel,
+                            imageUrl = byteArrayOf(),
+                            imageUrlString = entity.localPath ?: entity.imageUrl,
+                            onClick = {
+                                val previousRoute = navController.previousBackStackEntry?.destination?.route
+                                if (previousRoute?.contains("Result") == true) {
+                                    navController.navigate(Routes.Create) {
+                                        popUpTo(Routes.Create) { inclusive = true }
+                                    }
+                                } else {
+                                    navController.popBackStack()
+                                }
+                            }
+                        )
+                    }
+                    args.imageUrl.isNotEmpty() -> {
+                        CreateEditScreen(
+                            entity = null,
+                            viewModel = null,
+                            imageUrlString = args.imageUrl,
+                            onClick = { navController.popBackStack() }
+                        )
+                    }
+                    else -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = Color(0xFF99AD76))
+                        }
+                    }
+                }
             }
-
             composable<Routes.AbtToGenerate> {
                 AboutToGenerateScreen(
                     roomsViewModel = roomViewModel,
