@@ -57,6 +57,8 @@ data class RoomUiState(
     val purchaseError: String? = null,
     val generatedCount: Int = 0,
     val generatedImagesEntity: List<RecentGeneratedEntity> = emptyList(),
+    val isFetchingImages: Boolean = false,
+    val etaSeconds: Int = 0,
 
 
     )

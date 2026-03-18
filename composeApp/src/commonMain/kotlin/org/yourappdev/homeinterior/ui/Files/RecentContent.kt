@@ -33,6 +33,7 @@ import homeinterior.composeapp.generated.resources.roomplaceholder
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
+import org.yourappdev.homeinterior.utils.getImageModel
 
 @Composable
 fun RecentContent(
@@ -77,7 +78,7 @@ fun RecentContent(
                     if (bundle.isNotEmpty()) {
                         println("DEBUG: Loading image = ${bundle[0]}")
                         AsyncImage(
-                            model = bundle[0].localPath ?: bundle[0].imageUrl,
+                            model = getImageModel(bundle[0].localPath) ?: bundle[0].imageUrl,
                             contentDescription = "Generated Interior",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,

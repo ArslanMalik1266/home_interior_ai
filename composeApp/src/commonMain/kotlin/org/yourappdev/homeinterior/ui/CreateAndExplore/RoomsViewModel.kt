@@ -35,6 +35,7 @@ import org.yourappdev.homeinterior.ui.common.base.CommonUiEvent.ShowError
 import org.yourappdev.homeinterior.utils.downloadAndCacheImage
 import org.yourappdev.homeinterior.utils.executeApiCall
 import org.yourappdev.homeinterior.utils.getDeviceId
+import org.yourappdev.homeinterior.utils.readLocalFile
 import org.yourappdev.homeinterior.utils.toBase64
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -347,8 +348,10 @@ class RoomsViewModel(
                         // ✅ Step 2: Bytes ko base64 convert karo
                         val base64Image = "data:image/jpeg;base64,${event.imageBytes.toBase64()}"
                         val prompt = buildPromptFromState(_state.value)
-                        println("DEBUG_VM: Image base64 length = ${base64Image.length}")
-                        println("DEBUG_VM: Prompt = $prompt")
+                        println("🟡 PROMPT_PART1: ${prompt.take(200)}")
+                        println("🟡 PROMPT_PART2: ${prompt.drop(200).take(200)}")
+                        println("🟡 PROMPT_PART3: ${prompt.drop(400)}")
+                        println("🟡 PROMPT_LENGTH: ${prompt.length}")
 
                         // ✅ Step 3: Generate karo
                         val request = GenerateRoomRequest(
@@ -365,81 +368,105 @@ class RoomsViewModel(
                                 println("DEBUG_VM: fetchUrl = ${response.fetchUrl}")
                                 println("DEBUG_VM: eta = ${response.eta}")
 
-                                // ✅ Step 4: Processing ho to polling karo
-                                val finalResponse = if (response.isProcessing && response.fetchUrl != null) {
-                                    println("DEBUG_VM: Processing! Waiting ${response.eta}s...")
-                                    kotlinx.coroutines.delay((response.eta ?: 30) * 1000L)
+                                if (response.isProcessing && response.fetchUrl != null) {
 
-                                    var fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
-                                    var retries = 0
-
-                                    while (fetchResult is ResultState.Success &&
-                                        fetchResult.data.isProcessing && retries < 15) {
-                                        println("DEBUG_VM: Retry ${retries + 1}... still processing")
-                                        kotlinx.coroutines.delay(15_000L)  // ✅ 15 sec
-                                        fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
-                                        retries++
+                                    // ✅ SEEDHA state update — koi delay nahi
+                                    _state.update {
+                                        it.copy(
+                                            isGenerating = false,
+                                            isFetchingImages = true,
+                                            etaSeconds = response.eta ?: 30,
+                                            generatedCount = 1,
+                                            generatedImages = emptyList(),
+                                            generatedImagesEntity = emptyList()
+                                        )
                                     }
 
-                                    if (fetchResult is ResultState.Success) {
-                                        val final = fetchResult.data
-                                        println("DEBUG_VM: Final status = ${final.status}")
-                                        println("DEBUG_VM: Final images = ${final.availableImages.size}")
+                                    // ✅ Background mein ETA wait phir polling
+                                    viewModelScope.launch {
+                                        println("DEBUG_VM: Background ETA wait = ${response.eta}s")
+                                        kotlinx.coroutines.delay((response.eta ?: 30) * 1000L)
 
-                                        if (final.availableImages.isEmpty()) {
-                                            println("❌ No images after retries!")
-                                            _state.update { it.copy(isGenerating = false, errorMessage = "Generation timeout") }
-                                            return@launch
+                                        var fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
+                                        var retries = 0
+
+                                        while (retries < 20) {
+                                            if (fetchResult is ResultState.Success) {
+                                                val data = fetchResult.data
+                                                println("DEBUG_VM: Retry $retries - isProcessing=${data.isProcessing} - images=${data.availableImages.size}")
+
+                                                if (!data.isProcessing && data.availableImages.isNotEmpty()) {
+                                                    val images = data.availableImages
+                                                    val localPaths = images.map { url ->
+                                                        val path = downloadAndCacheImage(
+                                                            url = url,
+                                                            fileName = "interior_${kotlin.time.Clock.System.now().toEpochMilliseconds()}.jpg"
+                                                        )
+                                                        println("🔵 URL: $url")
+                                                        println("🔵 LOCAL_PATH: $path")
+                                                        path
+                                                    }
+                                                    images.forEachIndexed { index, url ->
+                                                        recentGeneratedRepository.saveGenerated(
+                                                            RecentGeneratedEntity(
+                                                                imageUrl = url,
+                                                                localPath = localPaths.getOrNull(index)
+                                                            )
+                                                        )
+                                                    }
+                                                    _state.update {
+                                                        it.copy(
+                                                            isFetchingImages = false,
+                                                            generatedImages = images,
+                                                            generatedCount = images.size,
+                                                            generatedImagesEntity = images.mapIndexed { index, url ->
+                                                                RecentGeneratedEntity(
+                                                                    imageUrl = url,
+                                                                    localPath = localPaths.getOrNull(index)
+                                                                )
+                                                            }
+                                                        )
+                                                    }
+                                                    break
+                                                }
+                                            }
+                                            retries++
+                                            kotlinx.coroutines.delay(10_000L)
+                                            fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
                                         }
-                                        final  // ✅ Return final
-                                    } else {
-                                        response
+
+                                        if (retries >= 20) {
+                                            _state.update {
+                                                it.copy(
+                                                    isFetchingImages = false,
+                                                    errorMessage = "Generation timeout — try again"
+                                                )
+                                            }
+                                        }
                                     }
-                                } else {
-                                    response
-                                }
 
-                                println("DEBUG_VM: Final status = ${finalResponse.status}")
-                                println("DEBUG_VM: Final images = ${finalResponse.availableImages.size}")
-
-                                if (finalResponse.isSuccess) {
-                                    val images = finalResponse.availableImages
+                                } else if (response.isSuccess) {
+                                    val images = response.availableImages
                                     val localPaths = images.map { url ->
                                         downloadAndCacheImage(
                                             url = url,
                                             fileName = "interior_${kotlin.time.Clock.System.now().toEpochMilliseconds()}.jpg"
                                         )
-
                                     }
-                                    localPaths.forEachIndexed { index, path ->
-                                        println("🔵 LOCAL_PATH[$index] = $path")
-                                    }
-
-                                    val response = httpClient.get(images[0])
-                                    println("DEBUG_VM: Content-Type = ${response.headers["Content-Type"]}")
-                                    println("DEBUG_VM: Body first 100 chars = ${response.bodyAsText().take(100)}")
-                                    images.forEachIndexed { index, url ->
-                                        println("DEBUG_VM: Image[$index] URL = $url")
-                                    }
-
                                     images.forEachIndexed { index, url ->
                                         recentGeneratedRepository.saveGenerated(
                                             RecentGeneratedEntity(
                                                 imageUrl = url,
-                                                localPath = localPaths.getOrNull(index) // ✅ Local path
+                                                localPath = localPaths.getOrNull(index)
                                             )
                                         )
                                     }
-                                    println("🔵 SAVE_FLOW: All ${images.size} images saved to database")
-
                                     _state.update {
                                         it.copy(
                                             isGenerating = false,
+                                            isFetchingImages = false,
                                             generatedImages = images,
-                                            decodedImageBytes = emptyList(),
                                             generatedCount = images.size,
-                                            jobId = finalResponse.id?.toString(),
-                                            generatedRoom = null,
                                             generatedImagesEntity = images.mapIndexed { index, url ->
                                                 RecentGeneratedEntity(
                                                     imageUrl = url,
@@ -479,6 +506,8 @@ class RoomsViewModel(
                         generatedImagesEntity = emptyList(),
                         isGenerating = false,
                         selectedRoomType = null,
+                        isFetchingImages = false,
+                        generatedCount = 0,
                         selectedStyleName = null,
                         selectedPaletteId = null,
                         currentPage = 0
@@ -611,6 +640,9 @@ class RoomsViewModel(
         // 1. Pehle selected palette dhoondein
         val selectedPalette = state.availableColors.firstOrNull { it.id == state.selectedPaletteId }
 
+        println("🎨 PALETTE: selectedPaletteId = ${state.selectedPaletteId}")
+        println("🎨 PALETTE: selectedPalette = $selectedPalette")
+        println("🎨 PALETTE: availableColors count = ${state.availableColors.size}")
         // 2. Colors ko transform karein (Color object -> "FFFFFF")
         val cleanHexColors = selectedPalette?.colors?.map { colorValue ->
             when (colorValue) {
@@ -719,6 +751,129 @@ class RoomsViewModel(
                 onDeleted() // Ye callback UI ko band karne ke liye hai
             } catch (e: Exception) {
                 _uiEvent.emit(CommonUiEvent.ShowError("Delete failed"))
+            }
+        }
+    }
+    @OptIn(ExperimentalTime::class)
+    fun redoGeneration(entity: RecentGeneratedEntity, onResult: () -> Unit) {
+        viewModelScope.launch {
+            val imageBytes = if (entity.localPath != null) {
+                try {
+                    readLocalFile(entity.localPath)
+                } catch (e: Exception) {
+                    null
+                }
+            } else null
+
+            if (imageBytes == null || imageBytes.isEmpty()) {
+                println("❌ Redo: No image bytes available")
+                return@launch
+            }
+
+            // ✅ Purani delete karo
+            recentGeneratedRepository.deleteGeneratedById(entity.id)
+
+            // ✅ isGenerating true karo — LoadingScreen dikhega
+            _state.update {
+                it.copy(
+                    selectedImageBytes = imageBytes,
+                    selectedFileName = "redo_${entity.id}.jpg",
+                    isGenerating = true,
+                    isFetchingImages = false,
+                    generatedImages = emptyList(),
+                    generatedImagesEntity = emptyList(),
+                    errorMessage = null
+                )
+            }
+
+            // ✅ Pehle Result screen pe jao
+            onResult()
+
+            // ✅ Phir generate karo — yeh isGenerating ko handle karega
+            val email = authViewModel.state.value.email ?: ""
+            val deviceId = getDeviceId()
+            val creditResult = spendCreditsUseCase(
+                userEmail = email,
+                deviceId = deviceId,
+                amount = 1
+            )
+            if (creditResult.isFailure) {
+                _state.update { it.copy(isGenerating = false, errorMessage = "Not enough credits") }
+                return@launch
+            }
+            authViewModel.fetchUserDetails()
+
+            val base64Image = "data:image/jpeg;base64,${imageBytes.toBase64()}"
+            val prompt = buildPromptFromState(_state.value)
+
+            val request = GenerateRoomRequest(
+                initImage = base64Image,
+                prompt = prompt
+            )
+            val result = generateRoomUseCase(request)
+
+            when (result) {
+                is ResultState.Success -> {
+                    val response = result.data
+                    if (response.isProcessing && response.fetchUrl != null) {
+                        _state.update {
+                            it.copy(
+                                isGenerating = false,
+                                isFetchingImages = true,
+                                etaSeconds = response.eta ?: 30,
+                                generatedImages = emptyList(),
+                                generatedImagesEntity = emptyList()
+                            )
+                        }
+
+                        // ✅ Polling
+                        kotlinx.coroutines.delay((response.eta ?: 30) * 1000L)
+                        var fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
+                        var retries = 0
+
+                        while (retries < 20) {
+                            if (fetchResult is ResultState.Success) {
+                                val data = fetchResult.data
+                                if (!data.isProcessing && data.availableImages.isNotEmpty()) {
+                                    val images = data.availableImages
+                                    val localPaths = images.map { url ->
+                                        downloadAndCacheImage(
+                                            url = url,
+                                            fileName = "interior_${kotlin.time.Clock.System.now().toEpochMilliseconds()}.jpg"
+                                        )
+                                    }
+                                    images.forEachIndexed { index, url ->
+                                        recentGeneratedRepository.saveGenerated(
+                                            RecentGeneratedEntity(
+                                                imageUrl = url,
+                                                localPath = localPaths.getOrNull(index)
+                                            )
+                                        )
+                                    }
+                                    _state.update {
+                                        it.copy(
+                                            isFetchingImages = false,
+                                            generatedImages = images,
+                                            generatedImagesEntity = images.mapIndexed { index, url ->
+                                                RecentGeneratedEntity(
+                                                    imageUrl = url,
+                                                    localPath = localPaths.getOrNull(index)
+                                                )
+                                            }
+                                        )
+                                    }
+                                    break
+                                }
+                            }
+                            retries++
+                            kotlinx.coroutines.delay(10_000L)
+                            fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
+                        }
+                    }
+                }
+                else -> {
+                    _state.update { it.copy(isGenerating = false) }
+                }
             }
         }
     }

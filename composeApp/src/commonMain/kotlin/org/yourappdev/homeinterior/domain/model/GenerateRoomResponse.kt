@@ -14,8 +14,11 @@ data class GenerateRoomResponse(
     @SerialName("eta") val eta: Int? = null,
 ) {
     val success: Boolean get() = status == "success" || status == "processing"
+    val isSuccess: Boolean get() = status == "success"
     val images: List<String> get() = output
     val isProcessing: Boolean get() = status == "processing"
     val job_id: String? get() = id?.toString()
     val count: Int get() = output.size
+    val availableImages: List<String> get() = output
+    val fetchUrl: String? get() = fetchResult
 }

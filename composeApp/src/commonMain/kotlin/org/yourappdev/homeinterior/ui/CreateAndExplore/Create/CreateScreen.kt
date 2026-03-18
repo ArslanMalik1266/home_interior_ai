@@ -56,6 +56,7 @@ import org.yourappdev.homeinterior.ui.CreateAndExplore.RoomsViewModel
 import org.yourappdev.homeinterior.ui.theme.black_color
 import org.yourappdev.homeinterior.ui.theme.green_btn
 import org.yourappdev.homeinterior.ui.theme.white_color
+import org.yourappdev.homeinterior.utils.getImageModel
 
 @Composable
 fun CreateScreen(
@@ -333,7 +334,7 @@ private fun RecentFilesRow(
                         val firstImage = bundle[0]
                         AsyncImage(
                             model = ImageRequest.Builder(LocalPlatformContext.current)
-                                .data(firstImage.localPath ?: firstImage.imageUrl)
+                                .data(getImageModel(firstImage.localPath) ?: firstImage.imageUrl)
                                 .crossfade(true)
                                 .build(),
                             contentDescription = null,

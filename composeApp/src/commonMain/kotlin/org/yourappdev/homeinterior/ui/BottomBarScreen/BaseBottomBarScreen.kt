@@ -333,6 +333,13 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                                 } else {
                                     navController.popBackStack()
                                 }
+                            },
+                            onRedo = {
+                                navController.navigate(Routes.Result) {
+                                    popUpTo(navController.graph.startDestinationId)
+                                    launchSingleTop = true
+
+                                }
                             }
                         )
                     }
@@ -403,6 +410,9 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                     },
                     generatedImages = state.generatedImagesEntity,
                     generatedImageUrls = state.generatedImages,
+                    isFetchingImages = state.isFetchingImages,
+                    generatedCount = state.generatedCount,
+                    etaSeconds = state.etaSeconds,
                     onImageClick = { index ->
                         navController.navigate(Routes.FileEdit(imageIndex = index))
                     }

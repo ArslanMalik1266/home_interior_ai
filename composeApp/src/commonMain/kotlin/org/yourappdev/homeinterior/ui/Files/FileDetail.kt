@@ -45,6 +45,7 @@ import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
 import org.yourappdev.homeinterior.ui.CreateAndExplore.RoomsViewModel
 import org.yourappdev.homeinterior.ui.UiUtils.CloseIconButton
 import org.yourappdev.homeinterior.ui.UiUtils.DeleteConfirmationDialog
+import org.yourappdev.homeinterior.utils.getImageModel
 import org.yourappdev.homeinterior.utils.saveImageToGallery
 import org.yourappdev.homeinterior.utils.shareImage
 import kotlin.time.Clock
@@ -55,6 +56,7 @@ import kotlin.time.ExperimentalTime
 fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                       imageUrlString: String = "",
                       onClick: () -> Unit,
+                      onRedo: () -> Unit = {},
                       viewModel: RoomsViewModel? = null,
                       entity: RecentGeneratedEntity? = null) {
     val scope = rememberCoroutineScope()
@@ -129,7 +131,16 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                     iconTint = grayText,
                     modifier = Modifier.weight(1f)
                 ) {
-
+                    if (viewModel != null && entity != null) {
+                        scope.launch {
+                            viewModel.redoGeneration(
+                                entity = entity,
+                                onResult = {
+                                    onRedo()
+                                }
+                            )
+                        }
+                    }
                 }
 
                 ActionButton(
@@ -311,6 +322,8 @@ fun ImageSection(
     LaunchedEffect(Unit) {
         println("🟢 ImageSection - imageUrl bytes: ${imageUrl.size}")
         println("🟢 ImageSection - imageUrlString: '$imageUrlString'")
+        println("🟢 ImageSection - model: ${if (imageUrl.isNotEmpty()) "ByteArray" else getImageModel(imageUrlString) ?: imageUrlString}")
+
     }
     var image by remember { mutableStateOf(Res.drawable.sofa_3) }
     var isPressed by remember { mutableStateOf(false) }
@@ -323,7 +336,7 @@ fun ImageSection(
     ) {
         AsyncImage(
             model = if (imageUrl.isNotEmpty()) imageUrl
-            else if (imageUrlString.isNotEmpty()) imageUrlString
+            else if (imageUrlString.isNotEmpty()) getImageModel(imageUrlString) ?: imageUrlString
             else null,
             contentDescription = "Editing Image",
             contentScale = ContentScale.Fit,

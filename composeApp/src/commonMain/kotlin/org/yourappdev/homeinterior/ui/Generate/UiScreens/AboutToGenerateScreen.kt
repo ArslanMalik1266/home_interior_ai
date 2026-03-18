@@ -56,8 +56,8 @@ fun AboutToGenerateScreen(
     LaunchedEffect(Unit) {
         roomsViewModel.onRoomEvent(RoomEvent.OnResetLoading)
     }
-    LaunchedEffect(state.generatedImages) {
-        if (state.generatedImages.isNotEmpty()) {
+    LaunchedEffect(state.isGenerating, state.isFetchingImages) {
+        if (!state.isGenerating && state.isFetchingImages) {
             onResult()
         }
     }
