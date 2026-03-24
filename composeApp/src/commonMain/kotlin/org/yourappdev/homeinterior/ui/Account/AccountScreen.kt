@@ -241,6 +241,18 @@ fun CreditCard(
                         contentDescription = null,
                         tint = Color.Unspecified
                     )
+//                    Icon(
+//                        modifier = Modifier.size(8.dp),
+//                        painter = painterResource(Res.drawable.ic_restore),
+//                        contentDescription = null,
+//                        tint = Color.Unspecified
+//                    )
+//                    Icon(
+//                        modifier = Modifier.size(8.dp),
+//                        painter = painterResource(Res.drawable.ic_restore),
+//                        contentDescription = null,
+//                        tint = Color.Unspecified
+//                    )
                     Text(
                         text = "Restore purchases",
                         fontSize = 9.sp,
