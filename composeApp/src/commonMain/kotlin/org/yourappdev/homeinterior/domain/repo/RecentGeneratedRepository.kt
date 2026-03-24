@@ -7,4 +7,5 @@ interface RecentGeneratedRepository {
     fun getRecentGenerated(): Flow<List<RecentGeneratedEntity>>
     suspend fun saveGenerated(generated: RecentGeneratedEntity): Long
     suspend fun deleteGeneratedById(id: Long)
+
 }

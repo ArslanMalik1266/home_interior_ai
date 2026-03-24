@@ -22,7 +22,7 @@ import org.yourappdev.homeinterior.ui.CreateAndExplore.Create.shimmerLoading
 import org.yourappdev.homeinterior.utils.getImageModel
 
 @Composable
-fun   ResultScreen(
+fun ResultScreen(
     generatedImages: List<RecentGeneratedEntity>,
     generatedImageUrls: List<String> = emptyList(),
     onCloseClick: () -> Unit = {},
@@ -43,12 +43,72 @@ fun   ResultScreen(
         ) {
             TopBar { onCloseClick() }
 
-            if (isFetchingImages) {
+            if (isFetchingImages && generatedImages.isEmpty()) {
+                // Koi image nahi aayi — sab shimmer dikhao
                 ShimmerResultGrid(imageCount = generatedCount)
             } else {
-                CreateContent(
+                // Jo images aa gayi + baaki shimmer
+                MixedResultGrid(
                     imageList = generatedImages,
+                    totalCount = generatedCount,
+                    isFetchingImages = isFetchingImages,
                     onImageClick = onImageClick
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MixedResultGrid(
+    imageList: List<RecentGeneratedEntity>,
+    totalCount: Int,
+    isFetchingImages: Boolean,
+    onImageClick: (Int) -> Unit
+) {
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Fixed(2),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        contentPadding = PaddingValues(vertical = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalItemSpacing = 16.dp
+    ) {
+        // Aayi hui images dikhao
+        itemsIndexed(
+            items = imageList,
+            key = { index, _ -> "image_$index" },
+            span = { index, _ ->
+                if ((index + 1) % 3 == 0) StaggeredGridItemSpan.FullLine
+                else StaggeredGridItemSpan.SingleLane
+            }
+        ) { index, entity ->
+            println("🔵 ENTITY[$index]: localPath=${entity.localPath}, imageUrl=${entity.imageUrl}")
+            val imageModel = getImageModel(entity.localPath) ?: entity.imageUrl.ifBlank { null }
+            ImageCard(
+                imageUrl = imageModel,
+                isLarge = (index + 1) % 3 == 0,
+                modifier = Modifier.clickable { onImageClick(index) }
+            )
+        }
+
+        // Baaki ke shimmer boxes dikhao
+        if (isFetchingImages) {
+            val remainingCount = totalCount - imageList.size
+            items(remainingCount, key = { "shimmer_$it" }) { index ->
+                val globalIndex = imageList.size + index
+                Box(
+                    modifier = Modifier
+                        .then(
+                            if ((globalIndex + 1) % 3 == 0)
+                                Modifier.fillMaxWidth().height(176.dp)
+                            else
+                                Modifier.aspectRatio(1f)
+                        )
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(Color(0xFFE8E8E8))
+                        .shimmerLoading()
                 )
             }
         }
@@ -66,7 +126,13 @@ private fun ShimmerResultGrid(imageCount: Int = 1) {
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalItemSpacing = 16.dp
     ) {
-        items(imageCount) { index ->
+        items(
+            count = imageCount,
+            span = { index ->
+                if ((index + 1) % 3 == 0) StaggeredGridItemSpan.FullLine
+                else StaggeredGridItemSpan.SingleLane
+            }
+        ) { index ->
             Box(
                 modifier = Modifier
                     .then(
@@ -84,44 +150,6 @@ private fun ShimmerResultGrid(imageCount: Int = 1) {
 }
 
 @Composable
-private fun CreateContent(
-    imageList: List<RecentGeneratedEntity>,
-    onImageClick: (Int) -> Unit
-) {
-    LazyVerticalStaggeredGrid(
-        columns = StaggeredGridCells.Fixed(2),
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        contentPadding = PaddingValues(vertical = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalItemSpacing = 16.dp
-    ) {
-        itemsIndexed(
-            items = imageList,
-            key = { index, _ -> index },
-            span = { index, _ ->
-                if ((index + 1) % 3 == 0) {
-                    StaggeredGridItemSpan.FullLine
-                } else {
-                    StaggeredGridItemSpan.SingleLane
-                }
-            }
-        ) { index, entity ->
-            println("🔵 ENTITY[$index]: localPath=${entity.localPath}, imageUrl=${entity.imageUrl}")
-
-            val imageModel = getImageModel(entity.localPath) ?: entity.imageUrl.ifBlank { null }
-
-            ImageCard(
-                imageUrl = imageModel,
-                isLarge = (index + 1) % 3 == 0,
-                modifier = Modifier.clickable { onImageClick(index) }
-            )
-        }
-    }
-}
-
-@Composable
 private fun ImageCard(
     imageUrl: Any?,
     isLarge: Boolean,
@@ -132,7 +160,8 @@ private fun ImageCard(
         contentDescription = "Room design",
         onError = { error ->
             println("❌ IMAGE_ERROR: ${error.result.throwable.message}")
-            println("❌ IMAGE_URL: $imageUrl")        },
+            println("❌ IMAGE_URL: $imageUrl")
+        },
         onSuccess = {
             println("✅ IMAGE_LOADED: $imageUrl")
         },

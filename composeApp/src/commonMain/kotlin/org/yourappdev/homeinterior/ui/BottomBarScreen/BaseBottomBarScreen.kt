@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -151,6 +153,11 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                     )
                 )
 
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(bottomBarBack)
+                ) {
                 SlippyBottomBar(
                     bar = SlippyBar(
                         barStyle = SlippyBarStyle(backgroundColor = bottomBarBack),
@@ -167,8 +174,10 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                     ),
                     tabs = tabs,
                     iconSize = 24.dp,
-                    fabIndex = 2
+                    fabIndex = 2,
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
+            }
             }
         },
         floatingActionButton = {
@@ -348,6 +357,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                             entity = null,
                             viewModel = null,
                             imageUrlString = args.imageUrl,
+                            isTrending = true,
                             onClick = { navController.popBackStack() }
                         )
                     }

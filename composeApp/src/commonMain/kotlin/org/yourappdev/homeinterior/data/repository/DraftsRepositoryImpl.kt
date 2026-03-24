@@ -11,4 +11,7 @@ class DraftsRepositoryImpl(private val db: AppDatabase) : DraftsRepository {
     override suspend fun saveDraft(draft: DraftEntity) = db.draftDao().insertDraft(draft)
 
     override suspend fun deleteDraft(draft: DraftEntity) = db.draftDao().deleteDraft(draft)
+    override suspend fun deleteDraftById(id: Long) = db.draftDao().deleteDraftById(id)
+
+
 }

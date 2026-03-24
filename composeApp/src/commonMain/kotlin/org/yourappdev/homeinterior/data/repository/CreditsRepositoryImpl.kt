@@ -40,10 +40,18 @@ class CreditsRepositoryImpl(
                 deviceId = deviceId,
                 packageName = packageName
             )
-            Result.success(response)
+            println("🔴 SPEND_RESPONSE: status=${response.status}, total=${response.total_credits}")
+            println("🔴 SPEND_REQUEST: email=$userEmail, deviceId=$deviceId, amount=$amount, package=$packageName")
+
+            if (response.status == "success" || response.status == "guest")  {
+                Result.success(response)
+            } else {
+                Result.failure(Exception("Not enough credits"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
+
 
 }

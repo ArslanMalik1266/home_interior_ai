@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SpendCreditsResponse(
-    val status: String,
-    val total_credits: Int
+    val status: String? = null,
+    val total_credits: Int? = null
 )

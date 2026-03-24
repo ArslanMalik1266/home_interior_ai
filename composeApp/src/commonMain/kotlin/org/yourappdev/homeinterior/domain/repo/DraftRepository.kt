@@ -8,4 +8,5 @@ interface DraftsRepository {
     fun getAllDrafts(): Flow<List<DraftEntity>>
     suspend fun saveDraft(draft: DraftEntity)
     suspend fun deleteDraft(draft: DraftEntity)
+    suspend fun deleteDraftById(id: Long)
 }

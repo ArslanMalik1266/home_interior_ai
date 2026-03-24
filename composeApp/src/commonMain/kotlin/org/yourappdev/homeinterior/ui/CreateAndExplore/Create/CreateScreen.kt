@@ -343,15 +343,6 @@ private fun RecentFilesRow(
                             placeholder = painterResource(Res.drawable.roomplaceholder),
                             error = painterResource(Res.drawable.roomplaceholder)
                         )
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(6.dp)
-                                .background(Color.Black.copy(0.6f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        ) {
-                            Text("${bundle.size} Pics", color = Color.White, fontSize = 9.sp)
-                        }
                     }
                 }
             }

@@ -25,4 +25,6 @@ interface DraftDao {
     // Agar aapko sirf limit mein data chahiye (e.g. sirf top 5 recent files)
     @Query("SELECT * FROM drafts ORDER BY createdAt DESC LIMIT 10")
     fun getRecentDrafts(): Flow<List<DraftEntity>>
+    @Query("DELETE FROM drafts WHERE id = :id")
+    suspend fun deleteDraftById(id: Long)
 }

@@ -27,4 +27,5 @@ class RecentGeneratedRepositoryImpl(
     override suspend fun deleteGeneratedById(id: Long) {
         recentGeneratedDao.deleteGeneratedById(id)
     }
+
 }

@@ -40,7 +40,6 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.yourappdev.homeinterior.ui.authentication.AuthViewModel
 
-@Preview
 @Composable
 fun AccountScreen(
     viewModel: AuthViewModel,
@@ -110,7 +109,7 @@ fun AccountScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            ModelsSection()
+//            ModelsSection()
 
             Spacer(modifier = Modifier.height(20.dp))
 

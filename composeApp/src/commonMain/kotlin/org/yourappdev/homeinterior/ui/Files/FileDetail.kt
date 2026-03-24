@@ -58,7 +58,8 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                       onClick: () -> Unit,
                       onRedo: () -> Unit = {},
                       viewModel: RoomsViewModel? = null,
-                      entity: RecentGeneratedEntity? = null) {
+                      entity: RecentGeneratedEntity? = null,
+                      isTrending: Boolean = false ) {
     val scope = rememberCoroutineScope()
     var saveSuccess by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(saveSuccess) {
@@ -107,93 +108,100 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
             ImageSection(
                 imageUrl = imageUrl,
                 imageUrlString = imageUrlString,
+                isTrending = isTrending,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 24.dp)
+                    .then(
+                        if (isTrending) Modifier.weight(1f) else Modifier
+                    ),
                 imageBorder = imageBorder
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ActionButton(
-                    icon = Res.drawable.redo,
-                    label = "Redo",
-                    backgroundColor = buttonBackground,
-                    textColor = darkText,
-                    iconTint = grayText,
-                    modifier = Modifier.weight(1f)
+            if (!isTrending) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (viewModel != null && entity != null) {
-                        scope.launch {
-                            viewModel.redoGeneration(
-                                entity = entity,
-                                onResult = {
-                                    onRedo()
+                        ActionButton(
+                            icon = Res.drawable.redo,
+                            label = "Redo",
+                            backgroundColor = buttonBackground,
+                            textColor = darkText,
+                            iconTint = grayText,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (viewModel != null && entity != null) {
+                                scope.launch {
+                                    viewModel.redoGeneration(
+                                        entity = entity,
+                                        onResult = { onRedo() })
                                 }
-                            )
+                            }
                         }
-                    }
+
+                        ActionButton(
+                            icon = Res.drawable.save,
+                            label = "Save",
+                            backgroundColor = buttonBackground,
+                            textColor = darkText,
+                            iconTint = grayText,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            scope.launch {
+                                val success = saveImageToGallery(
+                                    imageBytes = if (imageUrl.isNotEmpty()) imageUrl else null,
+                                    imageUrl = if (imageUrlString.isNotEmpty()) imageUrlString else null,
+                                    fileName = "interior_${
+                                        Clock.System.now().toEpochMilliseconds()
+                                    }.jpg"
+                                )
+                                saveSuccess = success
+                                println(if (success) "✅ Saved!" else "❌ Save failed")
+                            }
+
+                        }
+
+
+                        ActionButton(
+                            icon = Res.drawable.deletenew,
+                            label = "Delete",
+                            backgroundColor = buttonBackground,
+                            textColor = darkText,
+                            iconTint = grayText,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            showDelete = true
+                        }
+
+                        ActionButton(
+                            icon = Res.drawable.share,
+                            label = "Share",
+                            backgroundColor = Color.White,
+                            textColor = darkText,
+                            iconTint = grayText,
+                            hasBorder = true,
+                            borderColor = borderColor,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            scope.launch {
+                                shareImage(
+                                    imageBytes = if (imageUrl.isNotEmpty()) imageUrl else null,
+                                    imageUrl = if (imageUrlString.isNotEmpty()) imageUrlString else null,
+                                    fileName = "interior_design.jpg"
+                                )
+                            }
+
+                        }
+
+
                 }
-
-                ActionButton(
-                    icon = Res.drawable.save,
-                    label = "Save",
-                    backgroundColor = buttonBackground,
-                    textColor = darkText,
-                    iconTint = grayText,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    scope.launch {
-                        val success = saveImageToGallery(
-                            imageBytes = if (imageUrl.isNotEmpty()) imageUrl else null,
-                            imageUrl = if (imageUrlString.isNotEmpty()) imageUrlString else null,
-                            fileName = "interior_${Clock.System.now().toEpochMilliseconds()}.jpg"
-                        )
-                        saveSuccess = success
-                        println(if (success) "✅ Saved!" else "❌ Save failed")
-                    }
-
-                }
-
-                ActionButton(
-                    icon = Res.drawable.deletenew,
-                    label = "Delete",
-                    backgroundColor = buttonBackground,
-                    textColor = darkText,
-                    iconTint = grayText,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    showDelete = true
-                }
-
-                ActionButton(
-                    icon = Res.drawable.share,
-                    label = "Share",
-                    backgroundColor = Color.White,
-                    textColor = darkText,
-                    iconTint = grayText,
-                    hasBorder = true,
-                    borderColor = borderColor,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    scope.launch {
-                        shareImage(
-                            imageBytes = if (imageUrl.isNotEmpty()) imageUrl else null,
-                            imageUrl = if (imageUrlString.isNotEmpty()) imageUrlString else null,
-                            fileName = "interior_design.jpg"
-                        )
-                    }
-
-                }
-
             }
             saveSuccess?.let { success ->
                 Box(
@@ -317,7 +325,8 @@ fun ImageSection(
     imageUrl: ByteArray = byteArrayOf(),
     imageUrlString: String = "",
     modifier: Modifier = Modifier,
-    imageBorder: Color
+    imageBorder: Color,
+    isTrending: Boolean = false
 ) {
     LaunchedEffect(Unit) {
         println("🟢 ImageSection - imageUrl bytes: ${imageUrl.size}")
@@ -329,7 +338,7 @@ fun ImageSection(
     var isPressed by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
-                .aspectRatio(392f / 620f)
+            .then(if (!isTrending) Modifier.aspectRatio(392f / 620f) else Modifier)
             .clip(RoundedCornerShape(9.dp))
             .border(1.dp, imageBorder, RoundedCornerShape(9.dp))
             .background(Color(0xFFF5F5F5))
@@ -362,12 +371,14 @@ fun ImageSection(
                 },
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                painter = painterResource(Res.drawable.compare),
-                contentDescription = "Layers",
-                tint = Color(0xFFADAAAA),
-                modifier = Modifier.size(24.dp)
-            )
+            if (!isTrending) {
+                Icon(
+                    painter = painterResource(Res.drawable.compare),
+                    contentDescription = "Layers",
+                    tint = Color(0xFFADAAAA),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }
