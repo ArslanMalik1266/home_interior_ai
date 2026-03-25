@@ -1,4 +1,4 @@
-package org.yourappdev.homeinterior
+package org.yourappdev.homeinterior.di
 
 import org.koin.core.module.Module
 

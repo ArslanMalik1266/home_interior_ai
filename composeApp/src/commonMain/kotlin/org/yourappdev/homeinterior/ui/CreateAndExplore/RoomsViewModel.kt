@@ -28,12 +28,15 @@ import org.yourappdev.homeinterior.domain.usecase.AddCreditsUseCase
 import org.yourappdev.homeinterior.domain.usecase.FetchGeneratedRoomUseCase
 import org.yourappdev.homeinterior.domain.usecase.GenerateRoomUseCase
 import org.yourappdev.homeinterior.domain.usecase.SpendCreditsUseCase
+import org.yourappdev.homeinterior.domain.usecase.SpendCreditsUseCaseGuest
+import org.yourappdev.homeinterior.domain.usecase.StartImageTrackingUseCase
 import org.yourappdev.homeinterior.ui.Generate.UiScreens.ColorPalette
 import org.yourappdev.homeinterior.ui.Generate.UiScreens.InteriorStyle
 import org.yourappdev.homeinterior.ui.authentication.AuthViewModel
 import org.yourappdev.homeinterior.ui.authentication.register.RegisterEvent
 import org.yourappdev.homeinterior.ui.common.base.CommonUiEvent
 import org.yourappdev.homeinterior.ui.common.base.CommonUiEvent.ShowError
+import org.yourappdev.homeinterior.utils.NotificationManager
 import org.yourappdev.homeinterior.utils.downloadAndCacheImage
 import org.yourappdev.homeinterior.utils.executeApiCall
 import org.yourappdev.homeinterior.utils.getDeviceId
@@ -41,6 +44,7 @@ import org.yourappdev.homeinterior.utils.readLocalFile
 import org.yourappdev.homeinterior.utils.toBase64
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 class RoomsViewModel(
@@ -53,6 +57,8 @@ class RoomsViewModel(
     private val generateRoomUseCase: GenerateRoomUseCase,
     private val fetchGeneratedRoomUseCase: FetchGeneratedRoomUseCase,
     private val httpClient: io.ktor.client.HttpClient,
+    private val spendCreditsUseCaseGuest: SpendCreditsUseCaseGuest,
+    private val startImageTrackingUseCase: StartImageTrackingUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(RoomUiState())
     val state: StateFlow<RoomUiState> = _state.asStateFlow()
@@ -325,28 +331,83 @@ class RoomsViewModel(
             }
 
             is RoomEvent.OnGenerateClick -> {
+                println("🔴 GEN_START: Button clicked!")
+                println("🔴 GEN_START: email = '${authViewModel.state.value.email}'")
+                println("🔴 GEN_START: totalCredits = ${authViewModel.state.value.totalCredits}")
+                println("🔴 GEN_START: freeCredits = ${authViewModel.state.value.freeCredits}")
+                println("🔴 GEN_START: imageBytes = ${event.imageBytes.size}")
+                println("🔴 GEN_CHECK: About to check credits guard...")
+                val currentCredits = if (authViewModel.state.value.email.isNullOrBlank()) {
+                    // Guest — guestSession se lo
+                    authViewModel.guestSession.value?.totalCredits ?: 0
+                } else {
+                    // Logged in
+                    authViewModel.state.value.totalCredits
+                }
+
+                println("🔴 GEN_CHECK: currentCredits = $currentCredits")
+
+                if (currentCredits <= 0) {
+                    println("🔴 GEN_CHECK: ❌ NO CREDITS — returning!")
+                    viewModelScope.launch { _uiEvent.emit(ShowError("Not enough credits")) }
+                    return
+                }
+
                 _state.update {
                     it.copy(isGenerating = true, errorMessage = null)
                 }
+                println("🔴 GEN_CHECK: Passed credits guard, launching coroutine...")
+
 
                 viewModelScope.launch {
                     try {
                         val email = authViewModel.state.value.email ?: ""
                         val deviceId = getDeviceId()
+                        println("🔴 GEN_CREDIT: email blank? = ${email.isBlank()}")
+                        println("🔴 GEN_CREDIT: deviceId = $deviceId")
 
-                        // ✅ Sirf 1 credit cut karo
-                        val creditResult = spendCreditsUseCase(
-                            userEmail = email,
-                            deviceId = deviceId,
-                            amount = 1
-                        )
+                        val creditResult = if (email.isBlank()) {
+                            println("🔴 GEN_CREDIT: Using GUEST use case...")
+
+                            // Guest user
+                            println("DEBUG_GENERATE: Guest user — using SpendCreditsUseCaseGuest")
+                            spendCreditsUseCaseGuest(
+                                deviceId = deviceId,
+                                amount = 1
+                            )
+                        } else {
+                            println("🔴 GEN_CREDIT: Using LOGGED IN use case...")
+
+                            // Logged in user
+                            println("DEBUG_GENERATE: Logged in user — using SpendCreditsUseCase")
+                            spendCreditsUseCase(
+                                userEmail = email,
+                                deviceId = deviceId,
+                                amount = 1
+                            )
+                        }
+                        println("🔴 GEN_CREDIT: result = ${creditResult.isSuccess}")
+
+
                         if (creditResult.isFailure) {
-                            _state.update { it.copy(isGenerating = false, errorMessage = "Not enough credits") }
+                            println("🔴 GEN_CREDIT: FAILED! reason = ${creditResult.exceptionOrNull()?.message}")
+
+                            val error = creditResult.exceptionOrNull()?.message
+                            println("🔴 SERVER_REJECTED: $error")
+                            _state.update { it.copy(
+                                isGenerating = false,
+                                isFetchingImages = false, // Isse loading properly rukegi
+                                errorMessage = "Not enough credits"
+                            )}
+
                             _uiEvent.emit(ShowError("Not enough credits"))
                             return@launch
                         }
-                        authViewModel.fetchUserDetails()
+                        println("🔴 GEN_CREDIT: Credits spent! Moving to generation...")
 
+                        if (!email.isNullOrBlank()) {
+                            authViewModel.fetchUserDetails()
+                        }
                         val base64Image = "data:image/jpeg;base64,${event.imageBytes.toBase64()}"
                         val prompt = buildPromptFromState(_state.value)
                         val request = GenerateRoomRequest(initImage = base64Image, prompt = prompt)
@@ -407,10 +468,15 @@ class RoomsViewModel(
                                                             imageUrl = imageUrl,
                                                             localPath = localPath
                                                         )
+                                                        val allDone = newImages.size >= 3
+                                                        if (allDone) {
+                                                            NotificationManager.notifyIfBackground()
+                                                            println("🔔 NOTIFICATION: All 3 images done!")
+                                                        }
                                                         state.copy(
                                                             generatedImages = newImages,
                                                             generatedImagesEntity = newEntities,
-                                                            isFetchingImages = newImages.size < 3
+                                                            isFetchingImages = !allDone
                                                         )
                                                     }
 
@@ -419,7 +485,12 @@ class RoomsViewModel(
                                             }
                                             retries++
                                             kotlinx.coroutines.delay(10_000L)
-                                            fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
+                                            try {
+                                                fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
+                                            } catch (e: Exception) {
+                                                println("🔄 Network error, retry $retries: ${e.message}")
+                                                // Sirf wait karo aur retry karo
+                                            }
                                         }
                                     }
                                 }
@@ -727,16 +798,18 @@ class RoomsViewModel(
             // ✅ Phir generate karo — yeh isGenerating ko handle karega
             val email = authViewModel.state.value.email ?: ""
             val deviceId = getDeviceId()
-            val creditResult = spendCreditsUseCase(
-                userEmail = email,
-                deviceId = deviceId,
-                amount = 1
-            )
+            val creditResult = if (email.isBlank()) {
+                spendCreditsUseCaseGuest(deviceId = deviceId, amount = 1)
+            } else {
+                spendCreditsUseCase(userEmail = email, deviceId = deviceId, amount = 1)
+            }
             if (creditResult.isFailure) {
                 _state.update { it.copy(isGenerating = false, errorMessage = "Not enough credits") }
                 return@launch
             }
-            authViewModel.fetchUserDetails()
+            if (!email.isNullOrBlank()) {
+                authViewModel.fetchUserDetails()
+            }
 
             val base64Image = "data:image/jpeg;base64,${imageBytes.toBase64()}"
             val prompt = buildPromptFromState(_state.value)
@@ -750,6 +823,8 @@ class RoomsViewModel(
             when (result) {
                 is ResultState.Success -> {
                     val response = result.data
+                    val taskId = response.id?.toString() ?: "task_${kotlin.time.Clock.System.now().toEpochMilliseconds()}";                    val delay = response.eta?.toLong() ?: 30L
+                    startImageTrackingUseCase(taskId, delay)
                     if (response.isProcessing && response.fetchUrl != null) {
                         _state.update {
                             it.copy(

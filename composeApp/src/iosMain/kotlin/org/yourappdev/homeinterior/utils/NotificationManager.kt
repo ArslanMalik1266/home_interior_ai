@@ -1,50 +1,41 @@
 package org.yourappdev.homeinterior.utils
 
-import platform.UserNotifications.UNAuthorizationOptionAlert
-import platform.UserNotifications.UNAuthorizationOptionBadge
-import platform.UserNotifications.UNAuthorizationOptionSound
+import platform.UIKit.UIApplication
+import platform.UIKit.UIApplicationState
 import platform.UserNotifications.UNMutableNotificationContent
 import platform.UserNotifications.UNNotificationRequest
 import platform.UserNotifications.UNNotificationSound
-import platform.UserNotifications.UNTimeIntervalNotificationTrigger
 import platform.UserNotifications.UNUserNotificationCenter
 
-actual fun requestNotificationPermission() {
-    val center = UNUserNotificationCenter.currentNotificationCenter()
-    center.requestAuthorizationWithOptions(
-        UNAuthorizationOptionAlert or
-                UNAuthorizationOptionSound or
-                UNAuthorizationOptionBadge
-    ) { granted, error ->
-        println("🔔 iOS Notification Permission: $granted")
-    }
-}
-
-actual fun sendLocalNotification(
-    title: String,
-    body: String,
-    notificationId: Int
-) {
-    val content = UNMutableNotificationContent().apply {
-        setTitle(title)
-        setBody(body)
-        setSound(UNNotificationSound.defaultSound())
+actual object NotificationManager {
+    actual fun initialize() {
+        // iOS par agar koi special setup chahiye ho (e.g. badge reset)
     }
 
-    // 1 second baad notification aaye
-    val trigger = UNTimeIntervalNotificationTrigger.triggerWithTimeInterval(
-        timeInterval = 1.0,
-        repeats = false
-    )
+    actual fun notifyIfBackground() {
+        if (isAppInBackground()) {
+            val content = UNMutableNotificationContent().apply {
+                setTitle("Design Ready!")
+                setBody("Aapka naya home interior design taiyar hai.")
+                setSound(UNNotificationSound.defaultSound)
+            }
 
-    val request = UNNotificationRequest.requestWithIdentifier(
-        identifier = "image_ready_$notificationId",
-        content = content,
-        trigger = trigger
-    )
+            val request = UNNotificationRequest.requestWithIdentifier(
+                identifier = "design_status",
+                content = content,
+                trigger = null // null matlab foran dikhao
+            )
 
-    UNUserNotificationCenter.currentNotificationCenter()
-        .addNotificationRequest(request) { error ->
-            error?.let { println("❌ iOS Notification Error: $it") }
+            UNUserNotificationCenter.currentNotificationCenter().addNotificationRequest(request) { error ->
+                error?.let { println("Notification Error: ${it.localizedDescription}") }
+            }
         }
+    }
+
+    actual fun isAppInBackground(): Boolean {
+        val state = UIApplication.sharedApplication.applicationState
+        // iOS States: Active (0), Inactive (1), Background (2)
+        return state == UIApplicationState.UIApplicationStateBackground ||
+                state == UIApplicationState.UIApplicationStateInactive
+    }
 }

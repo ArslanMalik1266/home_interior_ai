@@ -128,7 +128,16 @@ fun AboutToGenerateScreen(
                 println("DEBUG_GENERATE: freeCredits = ${authState.freeCredits}")
                 println("DEBUG_GENERATE: selectedImageBytes = ${state.selectedImageBytes?.size}")
                 println("DEBUG_GENERATE: isGenerating = ${state.isGenerating}")
-                if (authState.totalCredits > 0) {
+                val effectiveCredits = if (authState.email.isNullOrBlank()) {
+                    // Guest — authViewModel se guestSession lo
+                    authViewModel.guestSession.value?.totalCredits ?: 0
+                } else {
+                    authState.totalCredits
+                }
+
+                println("DEBUG_GENERATE: effectiveCredits = $effectiveCredits")
+
+                if (effectiveCredits > 0) {
                     println("DEBUG_GENERATE: Credits available, starting generation...")
 
                     coroutineScope.launch {

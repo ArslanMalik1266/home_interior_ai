@@ -20,3 +20,19 @@ class SpendCreditsUseCase(
         )
     }
 }
+
+class SpendCreditsUseCaseGuest(
+    private val creditsRepository: CreditsRepository
+) {
+    suspend operator fun invoke(
+        deviceId: String,
+        amount: Int = 1,
+        packageName: String = "org.yourappdev.homeinterior"
+    ): Result<SpendCreditsResponse> {
+        return creditsRepository.spendCreditsGuest(
+            amount = amount,
+            deviceId = deviceId,
+            packageName = packageName
+        )
+    }
+}

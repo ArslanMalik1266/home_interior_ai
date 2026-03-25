@@ -43,7 +43,30 @@ class CreditsRepositoryImpl(
             println("🔴 SPEND_RESPONSE: status=${response.status}, total=${response.total_credits}")
             println("🔴 SPEND_REQUEST: email=$userEmail, deviceId=$deviceId, amount=$amount, package=$packageName")
 
-            if (response.status == "success" || response.status == "guest")  {
+            if (response.status == "success")  {
+                Result.success(response)
+            } else {
+                Result.failure(Exception("Not enough credits"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun spendCreditsGuest(
+        amount: Int,
+        deviceId: String,
+        packageName: String
+    ): Result<SpendCreditsResponse> {
+        return try {
+            val response = authService.spendCreditsGuest(
+                amount = amount,
+                deviceId = deviceId,
+                packageName = packageName
+            )
+            println("🔴 SPEND_RESPONSE: status=${response.status}, total=${response.total_credits}")
+
+            if (response.status == "success" )  {
                 Result.success(response)
             } else {
                 Result.failure(Exception("Not enough credits"))

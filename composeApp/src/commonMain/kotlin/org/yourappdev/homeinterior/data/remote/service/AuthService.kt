@@ -134,5 +134,21 @@ class AuthService(
             header("X-API-KEY", apiKey)
         }.body()
     }
+    suspend fun spendCreditsGuest(
+        amount: Int,
+        deviceId: String,
+        packageName: String
+    ): SpendCreditsResponse {
+        return client.submitForm(
+            url = "$baseUrl/credits/spend",
+            formParameters = Parameters.build {
+                append("amount", amount.toString())
+                append("device_id", deviceId)
+                append("package_name", packageName)
+            }
+        ) {
+            header("X-API-KEY", apiKey)
+        }.body()
+    }
 
 }

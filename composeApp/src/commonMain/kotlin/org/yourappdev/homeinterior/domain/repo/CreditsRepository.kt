@@ -12,4 +12,9 @@ interface CreditsRepository {
             deviceId: String,
             packageName: String
         ): Result<SpendCreditsResponse>
+    suspend fun spendCreditsGuest(
+        amount: Int,
+        deviceId: String,
+        packageName: String
+    ): Result<SpendCreditsResponse>
     }

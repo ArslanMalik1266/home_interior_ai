@@ -7,6 +7,7 @@ import org.yourappdev.homeinterior.domain.usecase.FetchGeneratedRoomUseCase
 import org.yourappdev.homeinterior.domain.usecase.GenerateRoomUseCase
 import org.yourappdev.homeinterior.domain.usecase.RegisterGuestUseCase
 import org.yourappdev.homeinterior.domain.usecase.SpendCreditsUseCase
+import org.yourappdev.homeinterior.domain.usecase.SpendCreditsUseCaseGuest
 import org.yourappdev.homeinterior.navigation.NavigationViewModel
 import org.yourappdev.homeinterior.ui.authentication.AuthViewModel
 import org.yourappdev.homeinterior.ui.CreateAndExplore.RoomsViewModel
@@ -18,6 +19,7 @@ val viewModelModule = module {
     factory { RegisterGuestUseCase(get()) }
     factory { GenerateRoomUseCase(get()) }
     factory { FetchGeneratedRoomUseCase(get()) }
+    factory { SpendCreditsUseCaseGuest(get()) }
 
     single {
         AuthViewModel(
@@ -42,6 +44,9 @@ val viewModelModule = module {
             generateRoomUseCase = get(),
             fetchGeneratedRoomUseCase = get(),
             httpClient = get(),
+            spendCreditsUseCaseGuest = get(),
+            startImageTrackingUseCase = get(),
+
         )
     }
 

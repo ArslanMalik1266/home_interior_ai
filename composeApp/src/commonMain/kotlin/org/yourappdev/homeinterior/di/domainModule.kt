@@ -7,6 +7,7 @@ import org.yourappdev.homeinterior.domain.usecase.LoginUseCase
 import org.yourappdev.homeinterior.domain.usecase.LogoutUseCase
 import org.yourappdev.homeinterior.domain.usecase.RegisterGuestUseCase
 import org.yourappdev.homeinterior.domain.usecase.ResendOtpUseCase
+import org.yourappdev.homeinterior.domain.usecase.StartImageTrackingUseCase
 import org.yourappdev.homeinterior.domain.usecase.VerifyOtpUseCase
 
 val domainModule = module {
@@ -17,4 +18,6 @@ val domainModule = module {
     factory { RegisterGuestUseCase(get()) }
     factory { GenerateRoomUseCase(get()) }
     factory { FetchGeneratedRoomUseCase(get()) }
+    factory { StartImageTrackingUseCase(get()) }
+
 }

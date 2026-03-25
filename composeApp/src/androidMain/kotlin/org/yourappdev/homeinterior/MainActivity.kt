@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
@@ -15,8 +16,19 @@ import androidx.core.view.WindowInsetsControllerCompat
 import org.koin.android.ext.koin.androidContext
 import org.yourappdev.homeinterior.data.local.getRoomDatabase
 import org.yourappdev.homeinterior.ui.App
+import org.yourappdev.homeinterior.utils.AppContext
+import org.yourappdev.homeinterior.utils.NotificationManager
 
 class MainActivity : ComponentActivity() {
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            println("✅ Notification permission granted!")
+        } else {
+            println("❌ Notification permission denied!")
+        }
+    }
     @RequiresApi(Build.VERSION_CODES.R)
     @SuppressLint("WrongConstant")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,15 +36,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // ✅ Notification setup
+        AppContext.set(this)
+        NotificationManager.initialize()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(
+                android.Manifest.permission.POST_NOTIFICATIONS
+            )
+        }
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        // Hide nav bar
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.hide(android.view.WindowInsets.Type.navigationBars())
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         window.statusBarColor = android.graphics.Color.TRANSPARENT
-
 
         setContent {
             App({
@@ -40,5 +59,5 @@ class MainActivity : ComponentActivity() {
             })
         }
     }
-}
 
+}

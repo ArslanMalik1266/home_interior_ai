@@ -59,6 +59,8 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.core.splashscreen)
             implementation(libs.ktor.client.okhttp)
+            implementation("androidx.work:work-runtime-ktx:2.9.0")
+            implementation("io.insert-koin:koin-androidx-workmanager:3.5.0")
 
         }
         iosMain.dependencies {

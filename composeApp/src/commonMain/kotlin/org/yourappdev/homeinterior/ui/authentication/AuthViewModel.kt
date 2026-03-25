@@ -78,6 +78,7 @@ class AuthViewModel(private val verifyOtpUseCase: VerifyOtpUseCase,
 
             when (result) {
                 is ResultState.Success -> {
+
                     val session = result.data
                     _guestSession.value = session
                     _state.update {
@@ -321,6 +322,7 @@ class AuthViewModel(private val verifyOtpUseCase: VerifyOtpUseCase,
                     println("DEBUG_LOGOUT: 6. Settings Cleared")
                     _state.value = RegisterState()
                     _user.value = null
+
 
                     _uiEvent.emit(CommonUiEvent.NavigateToSuccess)
                     println("DEBUG_LOGOUT: 7. Navigate Event Emitted")
