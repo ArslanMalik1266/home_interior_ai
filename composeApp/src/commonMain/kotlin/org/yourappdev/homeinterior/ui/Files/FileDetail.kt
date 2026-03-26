@@ -59,6 +59,7 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                       onRedo: () -> Unit = {},
                       viewModel: RoomsViewModel? = null,
                       entity: RecentGeneratedEntity? = null,
+                      selectedIndex: Int = 0,
                       isTrending: Boolean = false ) {
     val scope = rememberCoroutineScope()
     var saveSuccess by remember { mutableStateOf<Boolean?>(null) }
@@ -141,6 +142,7 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                                 scope.launch {
                                     viewModel.redoGeneration(
                                         entity = entity,
+                                        indexToReplace = selectedIndex,
                                         onResult = { onRedo() })
                                 }
                             }

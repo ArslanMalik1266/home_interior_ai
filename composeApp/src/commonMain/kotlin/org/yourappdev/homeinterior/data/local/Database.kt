@@ -4,6 +4,7 @@ import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
+import androidx.room.TypeConverters
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import kotlinx.coroutines.Dispatchers
 import org.yourappdev.homeinterior.data.local.dao.ProfileDao
@@ -18,6 +19,7 @@ import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
                RecentGeneratedEntity::class],
     version = 1
 )
+@TypeConverters(StringListConverter::class)
 @ConstructedBy(AppDatabaseConstructor::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun draftDao(): DraftDao

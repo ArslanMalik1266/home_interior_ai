@@ -241,6 +241,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                         navController.navigate(Routes.Subscription)
                     },
                     onAddPhotoClick = {
+                        roomViewModel.prepareForNewGeneration()
                         showGallery = true
                     },
                     onRoomClick = { room ->
@@ -316,23 +317,32 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                 val dbImages by roomViewModel.dbGeneratedImages.collectAsState()
                 val state by roomViewModel.state.collectAsState()
 
-
+                // 1. Pehle ye decide karein ke hum bundle (current generation) dekh rahe hain ya DB se purana data
                 val entity = remember(args, dbImages, state) {
                     when {
-                        args.imageIndex >= 0 -> state.generatedImagesEntity.getOrNull(args.imageIndex)
+                        // Agar generate screen se aa rahe hain (Result Screen bundle)
+                        args.imageIndex >= 0 && state.generatedImagesEntity.isNotEmpty() -> {
+                            state.generatedImagesEntity.firstOrNull()
+                        }
+                        // Agar Files screen se purana record khola hai
                         args.entityId != -1L -> dbImages.find { it.id == args.entityId }
-                        args.imageUrl.isNotEmpty() -> dbImages.find { it.imageUrl == args.imageUrl }
                         else -> null
                     }
                 }
 
+                // 2. Index handle karein (default 0)
+                val selectedIndex = if (args.imageIndex >= 0) args.imageIndex else 0
+
                 when {
                     entity != null -> {
+                        // Bundle ya DB record se sahi image path uthana
+                        val imagePath = entity.localPaths.getOrNull(selectedIndex) ?: ""
+
                         CreateEditScreen(
                             entity = entity,
                             viewModel = roomViewModel,
-                            imageUrl = byteArrayOf(),
-                            imageUrlString = entity.localPath ?: entity.imageUrl,
+                            selectedIndex = selectedIndex, // ✅ Ye pass karna zaroori hai Redo ke liye
+                            imageUrlString = imagePath,    // ✅ Sahi index wali image
                             onClick = {
                                 val previousRoute = navController.previousBackStackEntry?.destination?.route
                                 if (previousRoute?.contains("Result") == true) {
@@ -344,14 +354,15 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                                 }
                             },
                             onRedo = {
+                                // Redo ke baad Result screen pe wapas jana
                                 navController.navigate(Routes.Result) {
                                     popUpTo(navController.graph.startDestinationId)
                                     launchSingleTop = true
-
                                 }
                             }
                         )
                     }
+                    // Trending images ke liye logic
                     args.imageUrl.isNotEmpty() -> {
                         CreateEditScreen(
                             entity = null,
@@ -407,6 +418,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                     roomViewModel.resetSelectedGeneratedImage()
                 }
                 ResultScreen(
+                    viewModel = roomViewModel,
                     onCloseClick = {
                         val previousRoute = navController.previousBackStackEntry?.destination?.route
                         roomViewModel.onRoomEvent(RoomEvent.OnGenerationComplete)
@@ -418,13 +430,25 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                             }
                         }
                     },
+                    imageEtaSeconds = state.imageEtaSeconds,
                     generatedImages = state.generatedImagesEntity,
-                    generatedImageUrls = state.generatedImages,
                     isFetchingImages = state.isFetchingImages,
                     generatedCount = state.generatedCount,
-                    etaSeconds = state.etaSeconds,
                     onImageClick = { index ->
-                        navController.navigate(Routes.FileEdit(imageIndex = index))
+                        val currentBundle = roomViewModel.state.value.generatedImagesEntity.firstOrNull()
+                        if (currentBundle != null) {
+                            navController.navigate(
+                                Routes.FileEdit(
+                                    imageIndex = index,
+                                    entityId = currentBundle.id
+                                )
+                            )
+                        }
+                    },
+                    onBackClick = {
+                        navController.navigate(Routes.Create) {
+                            popUpTo(Routes.Create) { inclusive = true }
+                        }
                     }
                 )
             }

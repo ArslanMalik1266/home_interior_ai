@@ -75,8 +75,7 @@ fun CreateScreen(
     }
 
     // ✅ Bundles of entities
-    val generatedBundles = dbImages.chunked(1).take(10)
-
+    val generatedBundles = dbImages.take(10)
     LaunchedEffect(generatedBundles) {
         println("🟣 UI_CREATE: bundles count = ${generatedBundles.size}")
     }
@@ -103,7 +102,7 @@ fun CreateScreen(
             RecentFilesSection(
                 generatedBundles = generatedBundles,
                 onBundleClick = { bundle ->
-                    viewModel.onRoomEvent(RoomEvent.ShowSelectedBundle(bundle))
+                    viewModel.onRoomEvent(RoomEvent.ShowSelectedBundle(listOf(bundle)))
                     onShowResults()
                 },
                 onSeeAllClick = onSeeAllClick
@@ -279,8 +278,8 @@ private fun RoomCategoryCard(room: RoomUi, height: androidx.compose.ui.unit.Dp, 
 
 @Composable
 private fun RecentFilesSection(
-    generatedBundles: List<List<RecentGeneratedEntity>>,  // ✅ Correct type
-    onBundleClick: (List<RecentGeneratedEntity>) -> Unit,  // ✅ Correct type
+    generatedBundles: List<RecentGeneratedEntity>,  // ✅ Change type here
+    onBundleClick: (RecentGeneratedEntity) -> Unit,  // ✅ Correct type
     onSeeAllClick: () -> Unit
 ) {
     Column(modifier = Modifier.padding(bottom = 30.dp)) {
@@ -314,8 +313,8 @@ private fun RecentFilesSection(
 
 @Composable
 private fun RecentFilesRow(
-    generatedBundles: List<List<RecentGeneratedEntity>>,  // ✅ Data parameter
-    onBundleClick: (List<RecentGeneratedEntity>) -> Unit  // ✅ Callback parameter
+    generatedBundles: List<RecentGeneratedEntity>,  // ✅ Change type here
+    onBundleClick: (RecentGeneratedEntity) -> Unit // ✅ Callback parameter
 ) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -330,11 +329,11 @@ private fun RecentFilesRow(
                         .background(Color(0xFFE8E8E8))
                         .clickable { onBundleClick(bundle) }
                 ) {
-                    if (bundle.isNotEmpty()) {
-                        val firstImage = bundle[0]
+                    val coverImage = bundle.localPaths.firstOrNull() ?: bundle.imageUrls.firstOrNull()
+                    if (coverImage != null) {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalPlatformContext.current)
-                                .data(getImageModel(firstImage.localPath) ?: firstImage.imageUrl)
+                                .data(getImageModel(coverImage) ?: coverImage)
                                 .crossfade(true)
                                 .build(),
                             contentDescription = null,

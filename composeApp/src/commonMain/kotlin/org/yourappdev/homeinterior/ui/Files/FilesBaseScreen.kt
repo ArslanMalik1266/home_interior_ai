@@ -44,7 +44,7 @@ fun FilesScreen(
     onShowResults: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
-
+    val tasksProgress by viewModel.tasksProgress.collectAsState()
     val tabs = listOf("Recent", "Drafts")
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     var selectedTabIndex = remember {
@@ -134,16 +134,17 @@ fun FilesScreen(
 
                     // 2. RecentContent ko pass karein
                     RecentContent(
-                        generatedImages = dbImages,
-                        onBundleClick = { bundleUrls ->
-                            viewModel.onRoomEvent(RoomEvent.ShowSelectedBundle(bundleUrls))
-                            onShowResults()
-                        },
-                        onImageClick = { entity ->
-                            onImageClick(entity.id)  // ✅ ID pass karo
-                        }
-                    )
+                        state = state,
+                            generatedBundles = dbImages,
+                        isFetching = state.isFetchingImages,
+                        tasksProgress = tasksProgress,
+                            onBundleClick = { selectedBundle ->
+                                viewModel.onRoomEvent(RoomEvent.ShowSelectedBundle(listOf(selectedBundle)))
+                                onShowResults()
+                            }
+                        )
                 }
+
 
                 1 -> DraftsContent(
                     viewModel = viewModel,
@@ -153,8 +154,33 @@ fun FilesScreen(
                     }
                 )
             }
+
         }
     }
+
+
+}
+@Composable
+fun calculateProgress(isFetching: Boolean, generatedCount: Int): Float {
+    if (!isFetching) return 0f
+
+    // Timer state jo har second update hogi
+    val elapsed = remember(isFetching) { mutableIntStateOf(0) }
+    val maxSeconds = 90 // ResultScreen wala max time
+
+    LaunchedEffect(isFetching) {
+        if (isFetching) {
+            elapsed.intValue = 0
+            while (elapsed.intValue < maxSeconds) {
+                kotlinx.coroutines.delay(1000L)
+                elapsed.intValue++
+            }
+        }
+    }
+
+    // Percentage calculation (0.0 to 0.99)
+    val rawProgress = elapsed.intValue.toFloat() / maxSeconds.toFloat()
+    return rawProgress.coerceIn(0f, 0.99f)
 }
 
 

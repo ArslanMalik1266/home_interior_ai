@@ -13,6 +13,7 @@ import org.yourappdev.homeinterior.ui.Generate.UiScreens.ColorPalette
 import org.yourappdev.homeinterior.ui.Generate.UiScreens.InteriorStyle
 
 data class RoomUiState(
+    val imageEtaSeconds: List<Int> = emptyList(),
     val getRoomsResponse: ResultState<Rooms> = ResultState.Stable,
     val trendingRooms: List<RoomUi> = emptyList(),
     val allRooms: List<RoomUi> = emptyList(),
@@ -24,6 +25,8 @@ data class RoomUiState(
     val errorMessage: String? = null,
     val tempFilterCount: Int = 0,
     val isLoading: Boolean = true,
+    val currentTaskId: String? = null, // ✅ Har generation ki unique ID
+    val activeTasksCount: Int = 0,
     val showFilterSheet: Boolean = false,
     val tempFilterState: FilterState = FilterState(),
     val expandedRoomType: Boolean = false,

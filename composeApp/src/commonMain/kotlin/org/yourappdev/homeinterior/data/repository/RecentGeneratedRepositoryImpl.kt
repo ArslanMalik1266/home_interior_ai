@@ -16,7 +16,6 @@ class RecentGeneratedRepositoryImpl(
     override suspend fun saveGenerated(generated: RecentGeneratedEntity): Long {  // ← Long return
         println("🟡 REPO_SAVE: Saving entity...")
         println("🟡 REPO_SAVE:   - ID = ${generated.id}")
-        println("🟡 REPO_SAVE:   - URL = ${generated.imageUrl}")
 
         val newId = recentGeneratedDao.insertGenerated(generated)
 

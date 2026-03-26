@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.yourappdev.homeinterior.data.local.entities.DraftEntity
 import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
 import org.yourappdev.homeinterior.data.mapper.toUi
@@ -60,9 +62,17 @@ class RoomsViewModel(
     private val spendCreditsUseCaseGuest: SpendCreditsUseCaseGuest,
     private val startImageTrackingUseCase: StartImageTrackingUseCase,
 ) : ViewModel() {
+    private val listLock = Mutex()
     private val _state = MutableStateFlow(RoomUiState())
     val state: StateFlow<RoomUiState> = _state.asStateFlow()
+    private val _tasksProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val tasksProgress = _tasksProgress.asStateFlow()
+    @OptIn(ExperimentalTime::class)
+    val newTaskId = Clock.System.now().toEpochMilliseconds().toString()
 
+    private val _generationProgress = MutableStateFlow(0f)
+    val generationProgress = _generationProgress.asStateFlow()
+    private var timerJob: kotlinx.coroutines.Job? = null
     private val _uiEvent = MutableSharedFlow<CommonUiEvent>()
     val uiEvent = _uiEvent.asSharedFlow()
     private val _selectedGeneratedImage = MutableStateFlow<String?>(null)
@@ -159,7 +169,6 @@ class RoomsViewModel(
                     images.forEachIndexed { index, entity ->
                         println("🟢 FETCH_FLOW: [$index] -----------------")
                         println("🟢 FETCH_FLOW:   - ID = ${entity.id}")
-                        println("🟢 FETCH_FLOW:   - URL = ${entity.imageUrl}")
                         println("🟢 FETCH_FLOW:   - Created at = ${entity.createdAt}")
                     }
                 }
@@ -197,7 +206,9 @@ class RoomsViewModel(
                     it.copy(
                         selectedImageBytes = event.bytes,
                         selectedFileName = event.fileName,
-                        selectedImage = "image_picked"
+                        selectedImage = "image_picked",
+                        currentTaskId = null,
+                        isFetchingImages = false
                     )
                 }
             }
@@ -331,174 +342,132 @@ class RoomsViewModel(
             }
 
             is RoomEvent.OnGenerateClick -> {
-                println("🔴 GEN_START: Button clicked!")
-                println("🔴 GEN_START: email = '${authViewModel.state.value.email}'")
-                println("🔴 GEN_START: totalCredits = ${authViewModel.state.value.totalCredits}")
-                println("🔴 GEN_START: freeCredits = ${authViewModel.state.value.freeCredits}")
-                println("🔴 GEN_START: imageBytes = ${event.imageBytes.size}")
-                println("🔴 GEN_CHECK: About to check credits guard...")
+                // 1. Har generation ka apna unique ID aur settings freeze karein
+                val newTaskId = Clock.System.now().toEpochMilliseconds().toString()
+                val capturedPrompt = buildPromptFromState(_state.value)
+                val capturedImageBytes = event.imageBytes
+
+                // Credits check (Aapka existing logic)
                 val currentCredits = if (authViewModel.state.value.email.isNullOrBlank()) {
-                    // Guest — guestSession se lo
                     authViewModel.guestSession.value?.totalCredits ?: 0
                 } else {
-                    // Logged in
                     authViewModel.state.value.totalCredits
                 }
 
-                println("🔴 GEN_CHECK: currentCredits = $currentCredits")
-
                 if (currentCredits <= 0) {
-                    println("🔴 GEN_CHECK: ❌ NO CREDITS — returning!")
                     viewModelScope.launch { _uiEvent.emit(ShowError("Not enough credits")) }
                     return
                 }
 
-                _state.update {
-                    it.copy(isGenerating = true, errorMessage = null)
-                }
-                println("🔴 GEN_CHECK: Passed credits guard, launching coroutine...")
-
+                // Task count barhayein taake UI mein loader dikhayi de
+                _state.update { it.copy(
+                    activeTasksCount = it.activeTasksCount + 1,
+                    isFetchingImages = true,
+                    errorMessage = null
+                )}
 
                 viewModelScope.launch {
                     try {
+                        // Credits spend logic... (Existing code)
                         val email = authViewModel.state.value.email ?: ""
                         val deviceId = getDeviceId()
-                        println("🔴 GEN_CREDIT: email blank? = ${email.isBlank()}")
-                        println("🔴 GEN_CREDIT: deviceId = $deviceId")
-
-                        val creditResult = if (email.isBlank()) {
-                            println("🔴 GEN_CREDIT: Using GUEST use case...")
-
-                            // Guest user
-                            println("DEBUG_GENERATE: Guest user — using SpendCreditsUseCaseGuest")
-                            spendCreditsUseCaseGuest(
-                                deviceId = deviceId,
-                                amount = 1
-                            )
-                        } else {
-                            println("🔴 GEN_CREDIT: Using LOGGED IN use case...")
-
-                            // Logged in user
-                            println("DEBUG_GENERATE: Logged in user — using SpendCreditsUseCase")
-                            spendCreditsUseCase(
-                                userEmail = email,
-                                deviceId = deviceId,
-                                amount = 1
-                            )
-                        }
-                        println("🔴 GEN_CREDIT: result = ${creditResult.isSuccess}")
-
+                        val creditResult = if (email.isBlank()) spendCreditsUseCaseGuest(deviceId, 1) else spendCreditsUseCase(email, deviceId, 1)
 
                         if (creditResult.isFailure) {
-                            println("🔴 GEN_CREDIT: FAILED! reason = ${creditResult.exceptionOrNull()?.message}")
-
-                            val error = creditResult.exceptionOrNull()?.message
-                            println("🔴 SERVER_REJECTED: $error")
-                            _state.update { it.copy(
-                                isGenerating = false,
-                                isFetchingImages = false, // Isse loading properly rukegi
-                                errorMessage = "Not enough credits"
-                            )}
-
-                            _uiEvent.emit(ShowError("Not enough credits"))
+                            _state.update { it.copy(activeTasksCount = (it.activeTasksCount - 1).coerceAtLeast(0)) }
                             return@launch
                         }
-                        println("🔴 GEN_CREDIT: Credits spent! Moving to generation...")
 
-                        if (!email.isNullOrBlank()) {
-                            authViewModel.fetchUserDetails()
+                        // Generation request (captured variables ke saath)
+                        val base64Image = "data:image/jpeg;base64,${capturedImageBytes.toBase64()}"
+                        val request = GenerateRoomRequest(initImage = base64Image, prompt = capturedPrompt)
+
+                        // 3 Parallel Calls
+                        val results = awaitAll(
+                            async { generateRoomUseCase(request) },
+                            async { generateRoomUseCase(request) },
+                            async { generateRoomUseCase(request) }
+                        )
+
+                        val maxEta = results.filter { it is ResultState.Success }
+                            .map { (it as ResultState.Success).data.eta ?: 30 }
+                            .maxOrNull() ?: 30
+                        // ✅ Har task ka apna independent timer launch karein
+                        launch {
+                            for (seconds in 1..200) {
+                                kotlinx.coroutines.delay(1000L)
+                                val progress = (seconds.toFloat() / maxEta.toFloat()).coerceAtMost(0.99f)
+                                _tasksProgress.update { it + (newTaskId to progress) }
+
+                                // Agar task khatam ho jaye to timer rok dein
+                                val isStillActive = _tasksProgress.value.containsKey(newTaskId)
+                                if (!isStillActive) break                            }
                         }
-                        val base64Image = "data:image/jpeg;base64,${event.imageBytes.toBase64()}"
-                        val prompt = buildPromptFromState(_state.value)
-                        val request = GenerateRoomRequest(initImage = base64Image, prompt = prompt)
 
-                        // ✅ 3 parallel calls
-                        val job1 = async { generateRoomUseCase(request) }
-                        val job2 = async { generateRoomUseCase(request) }
-                        val job3 = async { generateRoomUseCase(request) }
-                        val results = awaitAll(job1, job2, job3)
-
-                        // ✅ Pehle 3 empty boxes dikhao
-                        _state.update {
-                            it.copy(
-                                isGenerating = false,
-                                isFetchingImages = true,
-                                generatedCount = 3,
-                                generatedImages = emptyList(),
-                                generatedImagesEntity = emptyList()
-                            )
-                        }
                         val allGeneratedUrls = mutableListOf<String>()
                         val allLocalPaths = mutableListOf<String>()
+                        var successCount = 0
 
-                        // ✅ 3no ko alag alag fetch karo
+                        // Fetching Logic
                         results.forEachIndexed { index, result ->
                             if (result is ResultState.Success) {
                                 val response = result.data
                                 if (response.isProcessing && response.fetchUrl != null) {
                                     launch {
-                                        kotlinx.coroutines.delay((response.eta ?: 30) * 1000L)
-                                        var fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
                                         var retries = 0
-
-                                        while (retries < 20) {
+                                        while (retries < 30) {
+                                            val fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
                                             if (fetchResult is ResultState.Success) {
                                                 val data = fetchResult.data
                                                 if (!data.isProcessing && data.availableImages.isNotEmpty()) {
                                                     val imageUrl = data.availableImages.first()
-                                                    val localPath = downloadAndCacheImage(
-                                                        url = imageUrl,
-                                                        fileName = "interior_${index}_${kotlin.time.Clock.System.now().toEpochMilliseconds()}.jpg"
-                                                    )
+                                                    val localPath = downloadAndCacheImage(imageUrl, "room_${newTaskId}_$index.jpg")
 
-                                                    recentGeneratedRepository.saveGenerated(
-                                                        RecentGeneratedEntity(
-                                                            imageUrl = imageUrl,
-                                                            localPath = localPath
-                                                        )
-                                                    )
-                                                    if (currentDraftId != null) {
-                                                        draftsRepository.deleteDraftById(currentDraftId!!)
-                                                        currentDraftId = null
-                                                    }
-                                                    // ✅ Har image aate hi apne box mein show karo
-                                                    _state.update { state ->
-                                                        val newImages = state.generatedImages + imageUrl
-                                                        val newEntities = state.generatedImagesEntity + RecentGeneratedEntity(
-                                                            imageUrl = imageUrl,
-                                                            localPath = localPath
-                                                        )
-                                                        val allDone = newImages.size >= 3
-                                                        if (allDone) {
-                                                            NotificationManager.notifyIfBackground()
-                                                            println("🔔 NOTIFICATION: All 3 images done!")
-                                                        }
-                                                        state.copy(
-                                                            generatedImages = newImages,
-                                                            generatedImagesEntity = newEntities,
-                                                            isFetchingImages = !allDone
-                                                        )
+                                                    listLock.withLock {
+                                                        allGeneratedUrls.add(imageUrl)
+                                                        allLocalPaths.add(localPath ?: "")
+                                                        successCount++
                                                     }
 
+                                                    _state.update { s ->
+                                                        s.copy(
+                                                            generatedImagesEntity = listOf(
+                                                                RecentGeneratedEntity(
+                                                                    imageUrls = allGeneratedUrls.toList(),
+                                                                    localPaths = allLocalPaths.toList(),
+                                                                    bundleId = newTaskId
+                                                                )
+                                                            )
+                                                        )
+                                                    }
+                                                    if (successCount >= 3) {
+                                                        // Bundle Complete! Save to DB
+                                                        val bundleToSave = RecentGeneratedEntity(
+                                                            imageUrls = allGeneratedUrls.toList(),
+                                                            localPaths = allLocalPaths.toList(),
+                                                            bundleId = newTaskId
+                                                        )
+                                                        recentGeneratedRepository.saveGenerated(bundleToSave)
+
+                                                        // Clean up this task
+                                                        _tasksProgress.update { it - newTaskId }
+                                                        _state.update { s -> s.copy(
+                                                            activeTasksCount = (s.activeTasksCount - 1).coerceAtLeast(0),
+                                                            isFetchingImages = s.activeTasksCount > 1
+                                                        )}
+                                                    }
                                                     break
                                                 }
                                             }
                                             retries++
-                                            kotlinx.coroutines.delay(10_000L)
-                                            try {
-                                                fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
-                                            } catch (e: Exception) {
-                                                println("🔄 Network error, retry $retries: ${e.message}")
-                                                // Sirf wait karo aur retry karo
-                                            }
+                                            kotlinx.coroutines.delay(5000L)
                                         }
                                     }
                                 }
                             }
                         }
-
                     } catch (e: Exception) {
-                        _state.update { it.copy(isGenerating = false, errorMessage = e.message) }
+                        _state.update { it.copy(activeTasksCount = (it.activeTasksCount - 1).coerceAtLeast(0)) }
                     }
                 }
             }
@@ -761,41 +730,34 @@ class RoomsViewModel(
         }
     }
     @OptIn(ExperimentalTime::class)
-    fun redoGeneration(entity: RecentGeneratedEntity, onResult: () -> Unit) {
+    fun redoGeneration(
+        entity: RecentGeneratedEntity,
+        indexToReplace: Int, // Naya parameter takay pata ho konsi image badalni hai
+        onResult: () -> Unit
+    ) {
         viewModelScope.launch {
-            val imageBytes = if (entity.localPath != null) {
-                try {
-                    readLocalFile(entity.localPath)
-                } catch (e: Exception) {
-                    null
-                }
+            // 1. Sirf wo image bytes uthao jise redo karna hai
+            val targetPath = entity.localPaths.getOrNull(indexToReplace)
+            val imageBytes = if (targetPath != null) {
+                try { readLocalFile(targetPath) } catch (e: Exception) { null }
             } else null
 
             if (imageBytes == null || imageBytes.isEmpty()) {
-                println("❌ Redo: No image bytes available")
+                println("❌ Redo: No image bytes found for index $indexToReplace")
                 return@launch
             }
 
-            // ✅ Purani delete karo
-            recentGeneratedRepository.deleteGeneratedById(entity.id)
-
-            // ✅ isGenerating true karo — LoadingScreen dikhega
+            // 2. UI State update (Loading dikhane ke liye)
             _state.update {
                 it.copy(
-                    selectedImageBytes = imageBytes,
-                    selectedFileName = "redo_${entity.id}.jpg",
                     isGenerating = true,
                     isFetchingImages = false,
-                    generatedImages = emptyList(),
-                    generatedImagesEntity = emptyList(),
                     errorMessage = null
                 )
             }
-
-            // ✅ Pehle Result screen pe jao
             onResult()
 
-            // ✅ Phir generate karo — yeh isGenerating ko handle karega
+            // 3. Credits check aur Generation (Same purana process)
             val email = authViewModel.state.value.email ?: ""
             val deviceId = getDeviceId()
             val creditResult = if (email.isBlank()) {
@@ -803,89 +765,86 @@ class RoomsViewModel(
             } else {
                 spendCreditsUseCase(userEmail = email, deviceId = deviceId, amount = 1)
             }
+
             if (creditResult.isFailure) {
                 _state.update { it.copy(isGenerating = false, errorMessage = "Not enough credits") }
                 return@launch
             }
-            if (!email.isNullOrBlank()) {
-                authViewModel.fetchUserDetails()
-            }
 
             val base64Image = "data:image/jpeg;base64,${imageBytes.toBase64()}"
             val prompt = buildPromptFromState(_state.value)
+            val request = GenerateRoomRequest(initImage = base64Image, prompt = prompt)
 
-            val request = GenerateRoomRequest(
-                initImage = base64Image,
-                prompt = prompt
-            )
             val result = generateRoomUseCase(request)
 
-            when (result) {
-                is ResultState.Success -> {
-                    val response = result.data
-                    val taskId = response.id?.toString() ?: "task_${kotlin.time.Clock.System.now().toEpochMilliseconds()}";                    val delay = response.eta?.toLong() ?: 30L
-                    startImageTrackingUseCase(taskId, delay)
-                    if (response.isProcessing && response.fetchUrl != null) {
-                        _state.update {
-                            it.copy(
-                                isGenerating = false,
-                                isFetchingImages = true,
-                                etaSeconds = response.eta ?: 30,
-                                generatedImages = emptyList(),
-                                generatedImagesEntity = emptyList()
-                            )
-                        }
+            if (result is ResultState.Success && result.data.fetchUrl != null) {
+                _state.update { it.copy(isGenerating = false, isFetchingImages = true) }
 
-                        // ✅ Polling
-                        kotlinx.coroutines.delay((response.eta ?: 30) * 1000L)
-                        var fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
-                        var retries = 0
+                var retries = 0
+                while (retries < 20) {
+                    val fetchResult = fetchGeneratedRoomUseCase(result.data.fetchUrl!!)
+                    if (fetchResult is ResultState.Success) {
+                        val data = fetchResult.data
+                        if (!data.isProcessing && data.availableImages.isNotEmpty()) {
 
-                        while (retries < 20) {
-                            if (fetchResult is ResultState.Success) {
-                                val data = fetchResult.data
-                                if (!data.isProcessing && data.availableImages.isNotEmpty()) {
-                                    val images = data.availableImages
-                                    val localPaths = images.map { url ->
-                                        downloadAndCacheImage(
-                                            url = url,
-                                            fileName = "interior_${kotlin.time.Clock.System.now().toEpochMilliseconds()}.jpg"
-                                        )
-                                    }
-                                    images.forEachIndexed { index, url ->
-                                        recentGeneratedRepository.saveGenerated(
-                                            RecentGeneratedEntity(
-                                                imageUrl = url,
-                                                localPath = localPaths.getOrNull(index)
-                                            )
-                                        )
-                                    }
-                                    _state.update {
-                                        it.copy(
-                                            isFetchingImages = false,
-                                            generatedImages = images,
-                                            generatedImagesEntity = images.mapIndexed { index, url ->
-                                                RecentGeneratedEntity(
-                                                    imageUrl = url,
-                                                    localPath = localPaths.getOrNull(index)
-                                                )
-                                            }
-                                        )
-                                    }
-                                    break
-                                }
+                            val newUrl = data.availableImages.first()
+                            val newPath = downloadAndCacheImage(newUrl, "redo_idx${indexToReplace}_${Clock.System.now().toEpochMilliseconds()}.jpg")
+
+                            // ✅ MAIN LOGIC: Purani list lo aur sirf target index update karo
+                            val updatedUrls = entity.imageUrls.toMutableList().apply {
+                                if (size > indexToReplace) set(indexToReplace, newUrl)
                             }
-                            retries++
-                            kotlinx.coroutines.delay(10_000L)
-                            fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
+                            val updatedPaths = entity.localPaths.toMutableList().apply {
+                                if (size > indexToReplace) set(indexToReplace, newPath ?: "")
+                            }
+
+                            // ✅ DB UPDATE: Purana record delete nahi hoga, sirf data replace hoga
+                            val updatedBundle = entity.copy(
+                                imageUrls = updatedUrls,
+                                localPaths = updatedPaths
+                            )
+                            recentGeneratedRepository.saveGenerated(updatedBundle)
+
+                            // 4. Result screen ko updated bundle dikhao
+                            _state.update { it.copy(
+                                isFetchingImages = false,
+                                generatedImagesEntity = listOf(updatedBundle)
+                            )}
+                            break
                         }
                     }
+                    retries++
+                    kotlinx.coroutines.delay(5000L)
                 }
-                else -> {
-                    _state.update { it.copy(isGenerating = false) }
+            } else {
+                _state.update { it.copy(isGenerating = false) }
+            }
+        }
+    }
+    fun startGlobalTimer() {
+        timerJob?.cancel()
+        _generationProgress.value = 0f
+        val maxEtaFromApi = _state.value.imageEtaSeconds.maxOrNull() ?: 30
+        timerJob = viewModelScope.launch {
+            for (seconds in 1..200) {
+                kotlinx.coroutines.delay(1000L)
+                val currentProgress = seconds.toFloat() / maxEtaFromApi.toFloat()
+                if (currentProgress >= 0.99f) {
+                    _generationProgress.value = 0.99f
+                } else {
+                    _generationProgress.value = currentProgress
+                }
+
+                if (!_state.value.isFetchingImages) {
+                    _generationProgress.value = 1f
+                    break
                 }
             }
         }
     }
+    fun prepareForNewGeneration() {
+        _state.update { it.copy(isFetchingImages = false) }
+    }
+
 
 }

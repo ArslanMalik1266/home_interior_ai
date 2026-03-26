@@ -1,5 +1,7 @@
 package org.yourappdev.homeinterior.ui.Generate.UiScreens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,144 +10,139 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
-import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import homeinterior.composeapp.generated.resources.Res
+import homeinterior.composeapp.generated.resources.roomplaceholder
+import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.painterResource
 import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
-import org.yourappdev.homeinterior.ui.CreateAndExplore.Create.shimmerLoading
+import org.yourappdev.homeinterior.ui.CreateAndExplore.RoomsViewModel
+import org.yourappdev.homeinterior.ui.UiUtils.CloseIconButton
 import org.yourappdev.homeinterior.utils.getImageModel
 
 @Composable
 fun ResultScreen(
+    viewModel: RoomsViewModel,
     generatedImages: List<RecentGeneratedEntity>,
-    generatedImageUrls: List<String> = emptyList(),
     onCloseClick: () -> Unit = {},
+    onBackClick: () -> Unit,
     isFetchingImages: Boolean = false,
-    etaSeconds: Int = 0,
-    generatedCount: Int = 1,
+    imageEtaSeconds: List<Int> = emptyList(),
+    generatedCount: Int = 3,
     onImageClick: (Int) -> Unit
 ) {
-    Box(
+    val scrollState = rememberScrollState()
+    val tasksProgress by viewModel.tasksProgress.collectAsState()
+    val isTaskRunning = tasksProgress.isNotEmpty() || isFetchingImages
+    val state by viewModel.state.collectAsState()
+    val currentProgress = tasksProgress.values.lastOrNull() ?: 0f
+    val currentBundle = state.generatedImagesEntity.firstOrNull()
+    // Bundle Logic
+    val tempImages = state.generatedImagesEntity.firstOrNull()
+    val paths = currentBundle?.localPaths ?: emptyList()
+    val urls = currentBundle?.imageUrls ?: emptyList()
+
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .background(Color.White)
     ) {
-        Column(
+        // ✅ Wahi Purani TopBar jo aapki app mein hai
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            TopBar { onCloseClick() }
-
-            if (isFetchingImages && generatedImages.isEmpty()) {
-                // Koi image nahi aayi — sab shimmer dikhao
-                ShimmerResultGrid(imageCount = generatedCount)
-            } else {
-                // Jo images aa gayi + baaki shimmer
-                MixedResultGrid(
-                    imageList = generatedImages,
-                    totalCount = generatedCount,
-                    isFetchingImages = isFetchingImages,
-                    onImageClick = onImageClick
-                )
+            CloseIconButton(iconSize = 20.dp) {
+                onCloseClick()
             }
-        }
-    }
-}
-
-@Composable
-private fun MixedResultGrid(
-    imageList: List<RecentGeneratedEntity>,
-    totalCount: Int,
-    isFetchingImages: Boolean,
-    onImageClick: (Int) -> Unit
-) {
-    LazyVerticalStaggeredGrid(
-        columns = StaggeredGridCells.Fixed(2),
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        contentPadding = PaddingValues(vertical = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalItemSpacing = 16.dp
-    ) {
-        // Aayi hui images dikhao
-        itemsIndexed(
-            items = imageList,
-            key = { index, _ -> "image_$index" },
-            span = { index, _ ->
-                if ((index + 1) % 3 == 0) StaggeredGridItemSpan.FullLine
-                else StaggeredGridItemSpan.SingleLane
-            }
-        ) { index, entity ->
-            println("🔵 ENTITY[$index]: localPath=${entity.localPath}, imageUrl=${entity.imageUrl}")
-            val imageModel = getImageModel(entity.localPath) ?: entity.imageUrl.ifBlank { null }
-            ImageCard(
-                imageUrl = imageModel,
-                isLarge = (index + 1) % 3 == 0,
-                modifier = Modifier.clickable { onImageClick(index) }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Results",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF2C2C2C)
             )
         }
 
-        // Baaki ke shimmer boxes dikhao
-        if (isFetchingImages) {
-            val remainingCount = totalCount - imageList.size
-            items(remainingCount, key = { "shimmer_$it" }) { index ->
-                val globalIndex = imageList.size + index
-                Box(
-                    modifier = Modifier
-                        .then(
-                            if ((globalIndex + 1) % 3 == 0)
-                                Modifier.fillMaxWidth().height(176.dp)
-                            else
-                                Modifier.aspectRatio(1f)
-                        )
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(Color(0xFFE8E8E8))
-                        .shimmerLoading()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ShimmerResultGrid(imageCount: Int = 1) {
-    LazyVerticalStaggeredGrid(
-        columns = StaggeredGridCells.Fixed(2),
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        contentPadding = PaddingValues(vertical = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalItemSpacing = 16.dp
-    ) {
-        items(
-            count = imageCount,
-            span = { index ->
-                if ((index + 1) % 3 == 0) StaggeredGridItemSpan.FullLine
-                else StaggeredGridItemSpan.SingleLane
-            }
-        ) { index ->
-            Box(
-                modifier = Modifier
-                    .then(
-                        if ((index + 1) % 3 == 0)
-                            Modifier.fillMaxWidth().height(176.dp)
-                        else
-                            Modifier.aspectRatio(1f)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 2000.dp)
+                .padding(horizontal = 24.dp)
+        ) {
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Fixed(2),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 2000.dp),
+                contentPadding = PaddingValues(vertical = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalItemSpacing = 16.dp,
+                userScrollEnabled = false
+            ) {
+                // DOWNLOADED IMAGES
+                itemsIndexed(
+                    items = paths,
+                    key = { index, _ -> "image_$index" },
+                    span = { index, _ ->
+                        if ((index + 1) % 3 == 0) StaggeredGridItemSpan.FullLine
+                        else StaggeredGridItemSpan.SingleLane
+                    }
+                ) { index, path ->
+                    val imageModel = getImageModel(path) ?: urls.getOrNull(index) ?: ""
+                    ImageCard(
+                        imageUrl = imageModel,
+                        isLarge = (index + 1) % 3 == 0,
+                        modifier = Modifier.clickable { onImageClick(index) }
                     )
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(Color(0xFFE8E8E8))
-                    .shimmerLoading()
-            )
+                }
+
+                // LOADING BOXES
+                    if (isFetchingImages) {
+                        val remainingCount = (generatedCount - paths.size).coerceAtLeast(0)
+                        items(count = remainingCount) { index ->
+                            val globalIndex = paths.size + index
+                            val isLarge = (globalIndex + 1) % 3 == 0
+
+                            EtaLoadingBox(
+                                progressValue = currentProgress,
+                                modifier = Modifier.fillMaxWidth().then(
+                                    if (isLarge) Modifier.height(176.dp) else Modifier.aspectRatio(1f)
+                                )
+                            )
+                        }
+                    }
+            }
         }
+
+        if (isFetchingImages) {
+            ExploreSection { onBackClick() }
+        }
+
+        Spacer(modifier = Modifier.height(40.dp))
     }
 }
 
@@ -158,24 +155,73 @@ private fun ImageCard(
     AsyncImage(
         model = imageUrl,
         contentDescription = "Room design",
-        onError = { error ->
-            println("❌ IMAGE_ERROR: ${error.result.throwable.message}")
-            println("❌ IMAGE_URL: $imageUrl")
-        },
-        onSuccess = {
-            println("✅ IMAGE_LOADED: $imageUrl")
-        },
         modifier = modifier
             .then(
                 if (isLarge) Modifier.fillMaxWidth().height(176.dp)
                 else Modifier.aspectRatio(1f)
             )
             .clip(RoundedCornerShape(9.dp))
-            .border(
-                width = 1.dp,
-                color = Color(0xFFCFCFCF),
-                shape = RoundedCornerShape(9.dp)
-            ),
-        contentScale = ContentScale.Crop
+            .border(1.dp, Color(0xFFCFCFCF), RoundedCornerShape(9.dp)),
+        contentScale = ContentScale.Crop,
+        placeholder = painterResource(Res.drawable.roomplaceholder),
+        error = painterResource(Res.drawable.roomplaceholder)
     )
+}
+
+@Composable
+private fun EtaLoadingBox(
+    progressValue: Float,
+    modifier: Modifier = Modifier
+) {
+    val animatedProgress by animateFloatAsState(targetValue = progressValue, animationSpec = tween(900))
+
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(9.dp)).background(Color(0xFFE8E8E8)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { 1f },
+                    color = Color(0xFFD0D0D0),
+                    strokeCap = StrokeCap.Round,
+                    modifier = Modifier.size(48.dp)
+                )
+                CircularProgressIndicator(
+                    progress = { animatedProgress },
+                    color = Color(0xFF222222),
+                    strokeCap = StrokeCap.Round,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text("${(animatedProgress * 100).toInt()}%", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun ExploreSection(onHome: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Explore while your images are generating",
+            fontSize = 13.sp,
+            color = Color.Gray,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = onHome,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD4F7BD)),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.height(45.dp).padding(horizontal = 24.dp)
+        ) {
+            Text("Go to Home", color = Color.Black, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(18.dp), tint = Color.Black)
+        }
+    }
 }
