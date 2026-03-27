@@ -1,23 +1,36 @@
 package org.yourappdev.homeinterior.ui.BottomBarScreen
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,10 +43,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.innerShadow
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -44,6 +60,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import homeinterior.composeapp.generated.resources.*
 import io.github.ismoy.imagepickerkmp.presentation.ui.components.GalleryPickerLauncher
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -65,6 +82,7 @@ import org.yourappdev.homeinterior.ui.Generate.UiScreens.ResultScreen
 import org.yourappdev.homeinterior.ui.UiUtils.*
 import org.yourappdev.homeinterior.ui.authentication.AuthViewModel
 import org.yourappdev.homeinterior.ui.theme.bottomBarBack
+import org.yourappdev.homeinterior.ui.theme.grey_color
 import org.yourappdev.homeinterior.ui.theme.selectedNavItem
 import org.yourappdev.homeinterior.ui.theme.unselectedNavItem
 import org.yourappdev.homeinterior.utils.getPlatformContext
@@ -81,8 +99,39 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
     var showGallery by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    val tasksProgress by roomViewModel.tasksProgress.collectAsState()
+    val roomState by roomViewModel.state.collectAsState()
+    val activeTaskIds = remember(tasksProgress) { tasksProgress.keys.toList() }
+    val currentTaskId = activeTaskIds.firstOrNull()
 
+    var showTapToView by remember { mutableStateOf<String?>(null) }
+    val rawProgress = tasksProgress[currentTaskId] ?: 0f
+    val progress = if (showTapToView != null) 1f else rawProgress
+    var lastTaskId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(tasksProgress) {
+        val currentId = tasksProgress.keys.firstOrNull()
 
+        // Check: Agar pehle task tha aur ab null ho gaya (matlab complete ho gaya)
+        if (currentId == null && lastTaskId != null && showTapToView == null) {
+            showTapToView = lastTaskId
+            delay(5000)
+            showTapToView = null
+            lastTaskId = null // Reset lastTaskId
+            roomViewModel.onRoomEvent(RoomEvent.OnGenerationComplete)
+        }
+
+        // Har baar update karein takay humein pichla active ID yaad rahe
+        if (currentId != null) {
+            lastTaskId = currentId
+        }
+    }
+    val isRunning = tasksProgress.isNotEmpty() || showTapToView != null
+    val loadingText = when {
+        showTapToView != null -> "Completed."
+        progress < 0.4f -> "Getting things ready.."
+        progress < 0.9f -> "Creating your image.."
+        else -> "Almost there.."
+    }
     val platformContext = getPlatformContext()
 
     val shouldShowBottomBar = currentDestination?.route?.let { route ->
@@ -225,254 +274,344 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
         },
         floatingActionButtonPosition = FabPosition.Center
     ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = Routes.Create,
-            modifier = Modifier
-                .background(Color.White)
-                .padding(bottom = padding.calculateBottomPadding())
+        Box(modifier = Modifier.fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = Routes.Create,
+                modifier = Modifier
+                    .background(Color.White)
+                    .padding(bottom = padding.calculateBottomPadding())
 
-        ) {
-            // Bottom bar destinations
-            composable<Routes.Create> {
-                CreateScreen(
-                    viewModel = roomViewModel,
-                    onPremiumClick = {
-                        navController.navigate(Routes.Subscription)
-                    },
-                    onAddPhotoClick = {
-                        roomViewModel.prepareForNewGeneration()
-                        showGallery = true
-                    },
-                    onRoomClick = { room ->
-                        navController.navigate(Routes.FileEdit(imageUrl = room.imageUrl, entityId = room.id.toLong()))                    },
-                    onShowResults = {
-                        navController.navigate(Routes.Result)
-                    },
-                    onSeeAllClick = {
-                        navController.navigate(Routes.Files) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-
-                )
-            }
-
-            composable<Routes.Explore> {
-                ExploreScreen(
-                    viewModel = roomViewModel,
-                    onRoomClick = { room ->
-                        navController.navigate(Routes.FileEdit(imageUrl = room.imageUrl))
-                    }
-                )
-            }
-
-            composable<Routes.Files> {
-                FilesScreen(
-                    viewModel = roomViewModel,
-                    navController = navController,
-                    onImageClick = { entityId ->
-                        navController.navigate(
-                            Routes.FileEdit(entityId = entityId)
-                        )
-                    },
-                    onShowResults = {
-                        navController.navigate(Routes.Result)
-                    }
-                )
-            }
-
-            composable<Routes.Account> {
-                AccountScreen(
-                    onSubscriptionClick = {
-                        navController.navigate(Routes.Subscription)
-                    },
-                    onProfileClick = {
-                        navController.navigate(Routes.Profile)
-                    },
-                    viewModel = authViewModel
-                )
-            }
-
-            composable<Routes.AddScreen> {
-                BaseGenerateScreen(
-
-                    roomViewModel,
-                    endToNext = {
-                        navController.navigate(Routes.AbtToGenerate)
-                    },
-                    onCloseClick = {
-                        roomViewModel.saveOrUpdateDraft()
-                        navController.popBackStack()
-                    }
-                )
-            }
-
-            composable<Routes.FileEdit> { backStackEntry ->
-                val args = backStackEntry.toRoute<Routes.FileEdit>()
-                val dbImages by roomViewModel.dbGeneratedImages.collectAsState()
-                val state by roomViewModel.state.collectAsState()
-
-                // 1. Pehle ye decide karein ke hum bundle (current generation) dekh rahe hain ya DB se purana data
-                val entity = remember(args, dbImages, state) {
-                    when {
-                        // Agar generate screen se aa rahe hain (Result Screen bundle)
-                        args.imageIndex >= 0 && state.generatedImagesEntity.isNotEmpty() -> {
-                            state.generatedImagesEntity.firstOrNull()
-                        }
-                        // Agar Files screen se purana record khola hai
-                        args.entityId != -1L -> dbImages.find { it.id == args.entityId }
-                        else -> null
-                    }
-                }
-
-                // 2. Index handle karein (default 0)
-                val selectedIndex = if (args.imageIndex >= 0) args.imageIndex else 0
-
-                when {
-                    entity != null -> {
-                        // Bundle ya DB record se sahi image path uthana
-                        val imagePath = entity.localPaths.getOrNull(selectedIndex) ?: ""
-
-                        CreateEditScreen(
-                            entity = entity,
-                            viewModel = roomViewModel,
-                            selectedIndex = selectedIndex, // ✅ Ye pass karna zaroori hai Redo ke liye
-                            imageUrlString = imagePath,    // ✅ Sahi index wali image
-                            onClick = {
-                                val previousRoute = navController.previousBackStackEntry?.destination?.route
-                                if (previousRoute?.contains("Result") == true) {
-                                    navController.navigate(Routes.Create) {
-                                        popUpTo(Routes.Create) { inclusive = true }
-                                    }
-                                } else {
-                                    navController.popBackStack()
+            )
+            {
+                // Bottom bar destinations
+                composable<Routes.Create> {
+                    CreateScreen(
+                        viewModel = roomViewModel,
+                        onPremiumClick = {
+                            navController.navigate(Routes.Subscription)
+                        },
+                        onAddPhotoClick = {
+                            roomViewModel.prepareForNewGeneration()
+                            showGallery = true
+                        },
+                        onRoomClick = { room ->
+                            navController.navigate(
+                                Routes.FileEdit(
+                                    imageUrl = room.imageUrl,
+                                    entityId = room.id.toLong()
+                                )
+                            )
+                        },
+                        onShowResults = {
+                            navController.navigate(Routes.Result)
+                        },
+                        onSeeAllClick = {
+                            navController.navigate(Routes.Files) {
+                                popUpTo(navController.graph.startDestinationId) {
+                                    saveState = true
                                 }
-                            },
-                            onRedo = {
-                                // Redo ke baad Result screen pe wapas jana
-                                navController.navigate(Routes.Result) {
-                                    popUpTo(navController.graph.startDestinationId)
-                                    launchSingleTop = true
-                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                        )
-                    }
-                    // Trending images ke liye logic
-                    args.imageUrl.isNotEmpty() -> {
-                        CreateEditScreen(
-                            entity = null,
-                            viewModel = null,
-                            imageUrlString = args.imageUrl,
-                            isTrending = true,
-                            onClick = { navController.popBackStack() }
-                        )
-                    }
-                    else -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = Color(0xFF99AD76))
                         }
-                    }
+
+                    )
                 }
-            }
-            composable<Routes.AbtToGenerate> {
-                AboutToGenerateScreen(
-                    roomsViewModel = roomViewModel,
-                    authViewModel= authViewModel,
-                    onCloseClick = {
-                        navController.popBackStack()
-                    },
-                    onResult = {
-                        navController.navigate(Routes.Result) {
-                            popUpTo(Routes.AbtToGenerate) { inclusive = true }
+
+                composable<Routes.Explore> {
+                    ExploreScreen(
+                        viewModel = roomViewModel,
+                        onRoomClick = { room ->
+                            navController.navigate(Routes.FileEdit(imageUrl = room.imageUrl))
                         }
-                    },
-                    onSubscriptionClick = {
-                        navController.navigate(Routes.Subscription)
-                    }
-                )
-            }
-
-            composable<Routes.Subscription> {
-                SubscriptionScreen(
-                    onBackClick = {
-                        navController.popBackStack()
-                    },
-                    roomsViewModel = roomViewModel
-                )
-            }
-
-            composable<Routes.Result> {
-                val state by roomViewModel.state.collectAsState()
-                val selectedImage by roomViewModel.selectedGeneratedImage.collectAsState()
-
-                selectedImage?.let {
-                    navController.navigate(Routes.FileEdit(imageUrl = it))
-                    roomViewModel.resetSelectedGeneratedImage()
+                    )
                 }
-                ResultScreen(
-                    viewModel = roomViewModel,
-                    onCloseClick = {
-                        val previousRoute = navController.previousBackStackEntry?.destination?.route
-                        roomViewModel.onRoomEvent(RoomEvent.OnGenerationComplete)
-                        if (previousRoute?.contains("Files") == true) {
+
+                composable<Routes.Files> {
+                    FilesScreen(
+                        viewModel = roomViewModel,
+                        navController = navController,
+                        onImageClick = { entityId ->
+                            navController.navigate(
+                                Routes.FileEdit(entityId = entityId)
+                            )
+                        },
+                        onShowResults = {
+                            navController.navigate(Routes.Result)
+                        }
+                    )
+                }
+
+                composable<Routes.Account> {
+                    AccountScreen(
+                        onSubscriptionClick = {
+                            navController.navigate(Routes.Subscription)
+                        },
+                        onProfileClick = {
+                            navController.navigate(Routes.Profile)
+                        },
+                        viewModel = authViewModel
+                    )
+                }
+
+                composable<Routes.AddScreen> {
+                    BaseGenerateScreen(
+
+                        roomViewModel,
+                        endToNext = {
+                            navController.navigate(Routes.AbtToGenerate)
+                        },
+                        onCloseClick = {
+                            roomViewModel.saveOrUpdateDraft()
                             navController.popBackStack()
-                        } else {
+                        }
+                    )
+                }
+
+                composable<Routes.FileEdit> { backStackEntry ->
+                    val args = backStackEntry.toRoute<Routes.FileEdit>()
+                    val dbImages by roomViewModel.dbGeneratedImages.collectAsState()
+                    val state by roomViewModel.state.collectAsState()
+
+                    // 1. Pehle ye decide karein ke hum bundle (current generation) dekh rahe hain ya DB se purana data
+                    val entity = remember(args, dbImages, state) {
+                        when {
+                            // Agar generate screen se aa rahe hain (Result Screen bundle)
+                            args.imageIndex >= 0 && state.generatedImagesEntity.isNotEmpty() -> {
+                                state.generatedImagesEntity.firstOrNull()
+                            }
+                            // Agar Files screen se purana record khola hai
+                            args.entityId != -1L -> dbImages.find { it.id == args.entityId }
+                            else -> null
+                        }
+                    }
+
+                    // 2. Index handle karein (default 0)
+                    val selectedIndex = if (args.imageIndex >= 0) args.imageIndex else 0
+
+                    when {
+                        entity != null -> {
+                            // Bundle ya DB record se sahi image path uthana
+                            val imagePath = entity.localPaths.getOrNull(selectedIndex) ?: ""
+
+                            CreateEditScreen(
+                                entity = entity,
+                                viewModel = roomViewModel,
+                                selectedIndex = selectedIndex, // ✅ Ye pass karna zaroori hai Redo ke liye
+                                imageUrlString = imagePath,    // ✅ Sahi index wali image
+                                onClick = {
+                                    val previousRoute =
+                                        navController.previousBackStackEntry?.destination?.route
+                                    if (previousRoute?.contains("Result") == true) {
+                                        navController.navigate(Routes.Create) {
+                                            popUpTo(Routes.Create) { inclusive = true }
+                                        }
+                                    } else {
+                                        navController.popBackStack()
+                                    }
+                                },
+                                onRedo = {
+                                    // Redo ke baad Result screen pe wapas jana
+                                    navController.navigate(Routes.Result) {
+                                        popUpTo(navController.graph.startDestinationId)
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
+                        }
+                        // Trending images ke liye logic
+                        args.imageUrl.isNotEmpty() -> {
+                            CreateEditScreen(
+                                entity = null,
+                                viewModel = null,
+                                imageUrlString = args.imageUrl,
+                                isTrending = true,
+                                onClick = { navController.popBackStack() }
+                            )
+                        }
+
+                        else -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = Color(0xFF99AD76))
+                            }
+                        }
+                    }
+                }
+                composable<Routes.AbtToGenerate> {
+                    AboutToGenerateScreen(
+                        roomsViewModel = roomViewModel,
+                        authViewModel = authViewModel,
+                        onCloseClick = {
+                            navController.popBackStack()
+                        },
+                        onResult = {
+                            navController.navigate(Routes.Result) {
+                                popUpTo(Routes.AbtToGenerate) { inclusive = true }
+                            }
+                        },
+                        onSubscriptionClick = {
+                            navController.navigate(Routes.Subscription)
+                        }
+                    )
+                }
+
+                composable<Routes.Subscription> {
+                    SubscriptionScreen(
+                        onBackClick = {
+                            navController.popBackStack()
+                        },
+                        roomsViewModel = roomViewModel
+                    )
+                }
+
+                composable<Routes.Result> {
+                    val state by roomViewModel.state.collectAsState()
+                    val selectedImage by roomViewModel.selectedGeneratedImage.collectAsState()
+
+                    selectedImage?.let {
+                        navController.navigate(Routes.FileEdit(imageUrl = it))
+                        roomViewModel.resetSelectedGeneratedImage()
+                    }
+                    ResultScreen(
+                        viewModel = roomViewModel,
+                        onCloseClick = {
+                            val previousRoute =
+                                navController.previousBackStackEntry?.destination?.route
+                            roomViewModel.onRoomEvent(RoomEvent.OnGenerationComplete)
+                            if (previousRoute?.contains("Files") == true) {
+                                navController.popBackStack()
+                            } else {
+                                navController.navigate(Routes.Create) {
+                                    popUpTo(Routes.Create) { inclusive = true }
+                                }
+                            }
+                        },
+                        imageEtaSeconds = state.imageEtaSeconds,
+                        generatedImages = state.generatedImagesEntity,
+                        isFetchingImages = state.isFetchingImages,
+                        generatedCount = 3,
+                        onImageClick = { index ->
+                            val currentBundle =
+                                roomViewModel.state.value.generatedImagesEntity.firstOrNull()
+                            if (currentBundle != null) {
+                                navController.navigate(
+                                    Routes.FileEdit(
+                                        imageIndex = index,
+                                        entityId = currentBundle.id
+                                    )
+                                )
+                            }
+                        },
+                        onBackClick = {
                             navController.navigate(Routes.Create) {
                                 popUpTo(Routes.Create) { inclusive = true }
                             }
                         }
-                    },
-                    imageEtaSeconds = state.imageEtaSeconds,
-                    generatedImages = state.generatedImagesEntity,
-                    isFetchingImages = state.isFetchingImages,
-                    generatedCount = state.generatedCount,
-                    onImageClick = { index ->
-                        val currentBundle = roomViewModel.state.value.generatedImagesEntity.firstOrNull()
-                        if (currentBundle != null) {
-                            navController.navigate(
-                                Routes.FileEdit(
-                                    imageIndex = index,
-                                    entityId = currentBundle.id
-                                )
-                            )
+                    )
+                }
+
+                composable<Routes.Profile> {
+                    ProfileScreen(
+                        authViewModel = authViewModel,
+                        onBackClick = {
+                            navController.popBackStack()
+                        },
+                        onLogoutSuccess = {
+                            rootNavController.navigate(Routes.Login) {
+                                popUpTo(0) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                        onLoginClick = {
+                            rootNavController.navigate(Routes.Login) {
+                                launchSingleTop = true
+                            }
                         }
-                    },
-                    onBackClick = {
-                        navController.navigate(Routes.Create) {
-                            popUpTo(Routes.Create) { inclusive = true }
-                        }
-                    }
-                )
+                    )
+                }
             }
 
-            composable<Routes.Profile> {
-                ProfileScreen(
-                    authViewModel = authViewModel,
-                    onBackClick = {
-                        navController.popBackStack()
-                    },
-                    onLogoutSuccess = {
-                        rootNavController.navigate(Routes.Login) {
-                            popUpTo(0) { inclusive = true }
-                            launchSingleTop = true
-                        }
-                    },
-                    onLoginClick = {
-                        rootNavController.navigate(Routes.Login) {
-                            launchSingleTop = true
+            AnimatedVisibility(
+                visible = isRunning,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it }),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = padding.calculateBottomPadding())
+                        .shadow(
+                            elevation = 24.dp,
+                        )
+                        .background(
+                            color = Color(0xFFFFFFFF),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                        )
+                        .padding(
+                            start = 16.dp,
+                            top = 16.dp,
+                            end = 16.dp,
+                            bottom = 24.dp
+                        ),
+                    verticalAlignment = Alignment.CenterVertically
+                )
+                {
+                    Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFD4F7BD)), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFF2C2C2C)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = loadingText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF2C2C2C)
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    if (showTapToView != null) {
+                        Text(
+                            text = "Tap to view",
+                            fontSize = 12.sp,
+                            color = Color(0xFFD4F7BD),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable {
+                                    navController.navigate(Routes.Result)
+                                    showTapToView = null
+                                    roomViewModel.onRoomEvent(RoomEvent.OnGenerationComplete)
+                                }
+                                .padding(8.dp)
+                        )
+                    } else {
+                        IconButton(
+                            onClick = {  },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel",
+                                tint = Color(0xFF8E8E8E),
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
-                )
+                }
             }
         }
+
 
         if (showGallery) {
             GalleryPickerLauncher(

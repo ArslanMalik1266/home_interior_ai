@@ -56,14 +56,21 @@ fun ResultScreen(
     val tasksProgress by viewModel.tasksProgress.collectAsState()
     val isTaskRunning = tasksProgress.isNotEmpty() || isFetchingImages
     val state by viewModel.state.collectAsState()
-    val currentProgress = tasksProgress.values.lastOrNull() ?: 0f
     val currentBundle = state.generatedImagesEntity.firstOrNull()
+    val currentTaskId = currentBundle?.bundleId
+    val currentProgress = tasksProgress[currentTaskId] ?: 0f
     // Bundle Logic
     val tempImages = state.generatedImagesEntity.firstOrNull()
+
+
     val paths = currentBundle?.localPaths ?: emptyList()
+
     val urls = currentBundle?.imageUrls ?: emptyList()
 
-
+    println("DEBUG_RESULT: isFetchingImages=$isFetchingImages")
+    println("DEBUG_RESULT: paths.size=${paths.size}")
+    println("DEBUG_RESULT: generatedCount=$generatedCount")
+    println("DEBUG_RESULT: currentBundle=$currentBundle")
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -122,8 +129,14 @@ fun ResultScreen(
 
                 // LOADING BOXES
                     if (isFetchingImages) {
-                        val remainingCount = (generatedCount - paths.size).coerceAtLeast(0)
-                        items(count = remainingCount) { index ->
+                        // ✅ NAYA — generatedCount 0 ho tab bhi 3 use karo
+                        val effectiveCount = if (generatedCount <= 0) 3 else generatedCount
+                        val remainingCount = (effectiveCount - paths.size).coerceAtLeast(0)
+                        items(count = remainingCount , key = { it },   span = { index ->                                    // ✅ YEH ADD KARO
+                            val globalIndex = paths.size + index
+                            if ((globalIndex + 1) % 3 == 0) StaggeredGridItemSpan.FullLine
+                            else StaggeredGridItemSpan.SingleLane
+                        }) { index ->
                             val globalIndex = paths.size + index
                             val isLarge = (globalIndex + 1) % 3 == 0
 

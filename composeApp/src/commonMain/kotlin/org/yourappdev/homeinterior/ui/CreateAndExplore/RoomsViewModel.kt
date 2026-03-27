@@ -363,8 +363,22 @@ class RoomsViewModel(
                 _state.update { it.copy(
                     activeTasksCount = it.activeTasksCount + 1,
                     isFetchingImages = true,
-                    errorMessage = null
+                    isGenerating = true,
+                    errorMessage = null,
+                    generatedCount = 3,
+
+                    // ✅ Sabse Zaroori Line:
+                    // Naya task shuru hote hi purana data saaf kar do takke
+                    // ResultScreen ko 0 images milen aur wo 3 loading boxes dikhaye
+                    generatedImagesEntity = listOf(
+                        RecentGeneratedEntity(
+                            imageUrls = emptyList(),
+                            localPaths = emptyList(),
+                            bundleId = newTaskId
+                        )
+                    )
                 )}
+
 
                 viewModelScope.launch {
                     try {
@@ -388,6 +402,24 @@ class RoomsViewModel(
                             async { generateRoomUseCase(request) },
                             async { generateRoomUseCase(request) }
                         )
+                        results.forEachIndexed { index, result ->
+                            if (result is ResultState.Success) {
+                                println("DEBUG_ETA: Task $index eta = ${result.data.eta}")
+                                println("DEBUG_ETA: Task $index fetchUrl = ${result.data.fetchUrl}")
+                                println("DEBUG_ETA: Task $index isProcessing = ${result.data.isProcessing}")
+                            }
+                        }
+                        _state.update { it.copy(
+                            isGenerating = false,
+                            isFetchingImages = true,
+                            generatedImagesEntity = listOf(
+                                RecentGeneratedEntity(
+                                    imageUrls = emptyList(),
+                                    localPaths = emptyList(),
+                                    bundleId = newTaskId
+                                )
+                            )
+                        )}
 
                         val maxEta = results.filter { it is ResultState.Success }
                             .map { (it as ResultState.Success).data.eta ?: 30 }
@@ -472,6 +504,7 @@ class RoomsViewModel(
                 }
             }
             is RoomEvent.OnGenerationComplete -> {
+                _tasksProgress.update { emptyMap() }
                 _state.update {
                     it.copy(
                         selectedImageBytes = null,
