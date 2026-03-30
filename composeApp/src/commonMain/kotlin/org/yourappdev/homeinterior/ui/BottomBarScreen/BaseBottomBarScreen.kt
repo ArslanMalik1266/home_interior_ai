@@ -85,6 +85,7 @@ import org.yourappdev.homeinterior.ui.theme.bottomBarBack
 import org.yourappdev.homeinterior.ui.theme.grey_color
 import org.yourappdev.homeinterior.ui.theme.selectedNavItem
 import org.yourappdev.homeinterior.ui.theme.unselectedNavItem
+import org.yourappdev.homeinterior.utils.GenerationStatus
 import org.yourappdev.homeinterior.utils.getPlatformContext
 
 @Composable
@@ -95,44 +96,21 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+
     val roomViewModel: RoomsViewModel = koinViewModel()
     var showGallery by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    val tasksStatus by roomViewModel.tasksStatus.collectAsState()
     val tasksProgress by roomViewModel.tasksProgress.collectAsState()
     val roomState by roomViewModel.state.collectAsState()
     val activeTaskIds = remember(tasksProgress) { tasksProgress.keys.toList() }
-    val currentTaskId = activeTaskIds.firstOrNull()
 
+    val currentTaskId = remember(tasksStatus) { tasksStatus.keys.firstOrNull() ?: "" }
+    val currentStatus = tasksStatus[currentTaskId] ?: GenerationStatus.IDLE
     var showTapToView by remember { mutableStateOf<String?>(null) }
-    val rawProgress = tasksProgress[currentTaskId] ?: 0f
-    val progress = if (showTapToView != null) 1f else rawProgress
-    var lastTaskId by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(tasksProgress) {
-        val currentId = tasksProgress.keys.firstOrNull()
-
-        // Check: Agar pehle task tha aur ab null ho gaya (matlab complete ho gaya)
-        if (currentId == null && lastTaskId != null && showTapToView == null) {
-            showTapToView = lastTaskId
-            delay(5000)
-            showTapToView = null
-            lastTaskId = null // Reset lastTaskId
-            roomViewModel.onRoomEvent(RoomEvent.OnGenerationComplete)
-        }
-
-        // Har baar update karein takay humein pichla active ID yaad rahe
-        if (currentId != null) {
-            lastTaskId = currentId
-        }
-    }
-    val isRunning = tasksProgress.isNotEmpty() || showTapToView != null
-    val loadingText = when {
-        showTapToView != null -> "Completed."
-        progress < 0.4f -> "Getting things ready.."
-        progress < 0.9f -> "Creating your image.."
-        else -> "Almost there.."
-    }
-    val platformContext = getPlatformContext()
+    val displayProgress = if (currentStatus == GenerationStatus.SUCCESS) 1f else (tasksProgress[currentTaskId] ?: 0f)
+        var lastTaskId by remember { mutableStateOf<String?>(null) }
 
     val shouldShowBottomBar = currentDestination?.route?.let { route ->
         route.contains("Create") ||
@@ -140,6 +118,19 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                 route.contains("Explore") ||
                 route.contains("Account")
     } ?: false
+    val isRunning = shouldShowBottomBar && currentTaskId.isNotEmpty() && currentStatus != GenerationStatus.IDLE
+    val loadingText = when (currentStatus) {
+        GenerationStatus.SUCCESS -> "Completed."
+        GenerationStatus.RUNNING -> {
+            when {
+                displayProgress < 0.4f -> "Getting things ready.."
+                displayProgress < 0.9f -> "Creating your image.."
+                else -> "Almost there.."
+            }
+        }
+        else -> ""
+    }
+    val platformContext = getPlatformContext()
 
 
     Scaffold(
@@ -564,7 +555,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                 {
                     Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFD4F7BD)), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
-                            progress = { progress },
+                            progress = { displayProgress },
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,
                             color = Color(0xFF2C2C2C)
@@ -581,7 +572,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    if (showTapToView != null) {
+                    if (currentStatus == GenerationStatus.SUCCESS) {
                         Text(
                             text = "Tap to view",
                             fontSize = 12.sp,
@@ -597,7 +588,9 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                         )
                     } else {
                         IconButton(
-                            onClick = {  },
+                            onClick = {
+                                roomViewModel.onRoomEvent(RoomEvent.OnCancelGeneration(taskId = currentTaskId))
+                            },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(

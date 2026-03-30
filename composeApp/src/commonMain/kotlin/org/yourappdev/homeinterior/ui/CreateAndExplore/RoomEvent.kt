@@ -21,6 +21,8 @@ sealed class RoomEvent {
         val fileName: String
     ) : RoomEvent()
 
+    data class OnCancelGeneration(val taskId: String) : RoomEvent()
+
 
     data class OnPurchasePlan(val price: String) : RoomEvent()
     data object ClearPurchaseState : RoomEvent()

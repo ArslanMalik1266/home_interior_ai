@@ -7,6 +7,7 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,6 +24,7 @@ import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
 import org.yourappdev.homeinterior.data.mapper.toUi
 import org.yourappdev.homeinterior.data.remote.util.ResultState
 import org.yourappdev.homeinterior.domain.model.GenerateRoomRequest
+import org.yourappdev.homeinterior.domain.model.GenerateRoomResponse
 import org.yourappdev.homeinterior.domain.repo.DraftsRepository
 import org.yourappdev.homeinterior.domain.repo.RecentGeneratedRepository
 import org.yourappdev.homeinterior.domain.repo.RoomsRepository
@@ -38,6 +40,7 @@ import org.yourappdev.homeinterior.ui.authentication.AuthViewModel
 import org.yourappdev.homeinterior.ui.authentication.register.RegisterEvent
 import org.yourappdev.homeinterior.ui.common.base.CommonUiEvent
 import org.yourappdev.homeinterior.ui.common.base.CommonUiEvent.ShowError
+import org.yourappdev.homeinterior.utils.GenerationStatus
 import org.yourappdev.homeinterior.utils.NotificationManager
 import org.yourappdev.homeinterior.utils.downloadAndCacheImage
 import org.yourappdev.homeinterior.utils.executeApiCall
@@ -63,10 +66,14 @@ class RoomsViewModel(
     private val startImageTrackingUseCase: StartImageTrackingUseCase,
 ) : ViewModel() {
     private val listLock = Mutex()
+    private val generationJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
     private val _state = MutableStateFlow(RoomUiState())
     val state: StateFlow<RoomUiState> = _state.asStateFlow()
     private val _tasksProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
     val tasksProgress = _tasksProgress.asStateFlow()
+    // Har TaskID ka apna status track karne ke liye
+    private val _tasksStatus = MutableStateFlow<Map<String, GenerationStatus>>(emptyMap())
+    val tasksStatus = _tasksStatus.asStateFlow()
     @OptIn(ExperimentalTime::class)
     val newTaskId = Clock.System.now().toEpochMilliseconds().toString()
 
@@ -342,8 +349,9 @@ class RoomsViewModel(
             }
 
             is RoomEvent.OnGenerateClick -> {
-                // 1. Har generation ka apna unique ID aur settings freeze karein
                 val newTaskId = Clock.System.now().toEpochMilliseconds().toString()
+                _tasksStatus.update { it + (newTaskId to GenerationStatus.RUNNING) }
+                _tasksProgress.update { it + (newTaskId to 0.0f) }
                 val capturedPrompt = buildPromptFromState(_state.value)
                 val capturedImageBytes = event.imageBytes
 
@@ -366,21 +374,15 @@ class RoomsViewModel(
                     isGenerating = true,
                     errorMessage = null,
                     generatedCount = 3,
-
-                    // ✅ Sabse Zaroori Line:
-                    // Naya task shuru hote hi purana data saaf kar do takke
-                    // ResultScreen ko 0 images milen aur wo 3 loading boxes dikhaye
-                    generatedImagesEntity = listOf(
-                        RecentGeneratedEntity(
-                            imageUrls = emptyList(),
-                            localPaths = emptyList(),
-                            bundleId = newTaskId
-                        )
+                    generatedImagesEntity = it.generatedImagesEntity + RecentGeneratedEntity(
+                        imageUrls = emptyList(),
+                        localPaths = emptyList(),
+                        bundleId = newTaskId
                     )
                 )}
 
 
-                viewModelScope.launch {
+                generationJobs[newTaskId] = viewModelScope.launch {
                     try {
                         // Credits spend logic... (Existing code)
                         val email = authViewModel.state.value.email ?: ""
@@ -482,11 +484,14 @@ class RoomsViewModel(
                                                         recentGeneratedRepository.saveGenerated(bundleToSave)
 
                                                         // Clean up this task
-                                                        _tasksProgress.update { it - newTaskId }
+                                                        _tasksStatus.update { it + (newTaskId to GenerationStatus.SUCCESS) }
                                                         _state.update { s -> s.copy(
                                                             activeTasksCount = (s.activeTasksCount - 1).coerceAtLeast(0),
-                                                            isFetchingImages = s.activeTasksCount > 1
+                                                            isFetchingImages = s.activeTasksCount > 1,
                                                         )}
+                                                        delay(5000L)
+                                                        _tasksStatus.update { it - newTaskId }
+                                                        _tasksProgress.update { it - newTaskId }
                                                     }
                                                     break
                                                 }
@@ -502,6 +507,22 @@ class RoomsViewModel(
                         _state.update { it.copy(activeTasksCount = (it.activeTasksCount - 1).coerceAtLeast(0)) }
                     }
                 }
+            }
+            is RoomEvent.OnCancelGeneration -> {
+                generationJobs[event.taskId]?.cancel()
+                generationJobs.remove(event.taskId)
+
+
+                _state.update { it.copy(
+                    isGenerating = false,
+                    isFetchingImages = false,
+                    generationStatus = GenerationStatus.IDLE,
+                    activeTasksCount = (it.activeTasksCount - 1).coerceAtLeast(0)
+                )}
+
+                // ✅ Sirf is task ko remove karo
+                _tasksProgress.update { it - event.taskId }
+                _tasksStatus.update { it - event.taskId }
             }
             is RoomEvent.OnGenerationComplete -> {
                 _tasksProgress.update { emptyMap() }
@@ -526,7 +547,7 @@ class RoomsViewModel(
                 _state.update {
                     it.copy(
                         generatedImagesEntity   = event.bundle,
-                        isGenerating = false
+                        isGenerating = false,
                     )
                 }
             }
@@ -663,13 +684,33 @@ class RoomsViewModel(
         val colorPaletteString = cleanHexColors.joinToString(", ")
 
         return """
-      Photorealistic architectural photography of a $style $roomType, 
-        interior design with $colorPaletteString color scheme. 
-        High-end furniture, premium textures like velvet and polished wood, 
-        soft cinematic sunlight through windows, 8k resolution, 
-        highly detailed materials, sharp focus, masterpiece, 
-        vibrant yet professional atmosphere, depth of field, no texts on photo, and Redecorate walls, maintain architecture.
-    """.trimIndent()
+Photorealistic architectural photography of a $style $roomType, strictly adhering to the $style design language and spatial characteristics typical of a $roomType.
+
+The original architecture must remain completely unchanged: no new windows, no removal of doors, no structural modifications, no added openings, no layout alterations. Preserve all architectural elements exactly as they are (walls, doors, windows, ceiling, proportions, and spatial layout). Only surface-level decoration is allowed.
+
+The interior must use a $colorPaletteString color scheme exclusively, where all primary and secondary elements (walls, furniture, decor, textiles, and lighting tones) are derived from or harmonized with $colorPaletteString. If $colorPaletteString contains only one color, create depth using tonal variations (shades, tints, and gradients) of that single color only. No unrelated colors, substitutions, reflections introducing new hues, or neutral shifts are allowed.
+
+If $colorPaletteString = black: enforce true black dominance — deep black tones only (matte black, jet black, charcoal near-black). Do NOT generate grey, blue, brown, or desaturated substitutes. The scene must remain visually dark and black-dominant, not bright or washed out.
+
+Redecorate walls in alignment with $style, while preserving the original architectural structure and layout of the $roomType. Add minimal, style-appropriate wall elements (such as panels, moldings, or subtle decor), all strictly within $colorPaletteString, avoiding clutter or variation.
+
+Include high-end furniture consistent with $style, featuring premium materials such as velvet, polished wood, marble, brushed metal, or glass, with highly detailed textures. Furniture must be logically and professionally arranged according to real interior design principles (correct scale, spacing, alignment, and function), with no floating, misaligned, or awkwardly placed objects. Maintain clear focal points and natural flow within the $roomType. All furniture colors must strictly conform to $colorPaletteString.
+
+Lighting should be soft cinematic natural sunlight entering only through existing architectural openings (no new windows), creating gentle shadows and a professional atmosphere, while preserving the integrity and depth of $colorPaletteString without washing out, brightening, or shifting tones.
+
+Ultra-high-resolution (8K), sharp focus, depth of field, highly detailed materials, physically accurate lighting, global illumination, and realistic reflections.
+
+Composition should resemble professional interior architectural photography, with balanced framing, clear subject hierarchy, and a refined aesthetic.
+
+Strict priority constraints (must not be violated):
+
+Do not modify architecture in any way
+Do not add or remove windows, doors, or structural elements
+Enforce $colorPaletteString with zero color deviation
+Black must appear as true black, not grey or tinted
+No color contamination from lighting or reflections
+No misplaced furniture, no floating objects, no clutter
+No text, no watermark, no typography""".trimIndent()
     }
 
     // Helper to clean existing strings

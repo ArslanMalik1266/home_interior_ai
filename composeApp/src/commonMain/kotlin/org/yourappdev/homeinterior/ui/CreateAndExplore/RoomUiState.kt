@@ -11,6 +11,7 @@ import org.yourappdev.homeinterior.domain.model.RoomUi
 import org.yourappdev.homeinterior.domain.model.Rooms
 import org.yourappdev.homeinterior.ui.Generate.UiScreens.ColorPalette
 import org.yourappdev.homeinterior.ui.Generate.UiScreens.InteriorStyle
+import org.yourappdev.homeinterior.utils.GenerationStatus
 
 data class RoomUiState(
     val imageEtaSeconds: List<Int> = emptyList(),
@@ -50,6 +51,9 @@ data class RoomUiState(
     val isStyleSearchExpanded: Boolean = false,
     val selectedPaletteId: Int? = availableColors.firstOrNull()?.id,
     val isGenerating: Boolean = false,
+    val generationStatus: GenerationStatus = GenerationStatus.IDLE,
+
+
     val generatedImages: List<String> = emptyList(),
     val jobId: String? = null,
     val generatedRoom: GenerateRoomResponse? = null,

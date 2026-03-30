@@ -72,6 +72,7 @@
 			buildConfigurationList = A068F34E40F7AF7A8A3DCE5E /* Build configuration list for PBXNativeTarget "iosApp" */;
 			buildPhases = (
 				E9FDDC27B99B1B4C56E02574 /* Compile Kotlin Framework */,
+				248F210B2F7A4879008A9656 /* ShellScript */,
 				56D383496DE4C63ABCF9A59C /* Sources */,
 				03D444F6E254C329F076F1F5 /* Frameworks */,
 				9DF75D0322D38AF0BD608059 /* Resources */,
@@ -135,6 +136,23 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		248F210B2F7A4879008A9656 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\ncd \"$SRCROOT/..\"\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode\n";
+		};
 		E9FDDC27B99B1B4C56E02574 /* Compile Kotlin Framework */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -181,6 +199,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
 				DEVELOPMENT_TEAM = 6344BW5R7X;
 				ENABLE_PREVIEWS = YES;
+				"FRAMEWORK_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/../composeApp/build/bin/iosSimulatorArm64/debugFramework";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need gallery access to redesign your room.";
@@ -286,6 +305,7 @@
 				DEVELOPMENT_TEAM = 6344BW5R7X;
 				ENABLE_PREVIEWS = YES;
 				"EXCLUDED_ARCHS[sdk=*]" = "";
+				"FRAMEWORK_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/../composeApp/build/bin/iosArm64/releaseFramework";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need gallery access to redesign your room.";
