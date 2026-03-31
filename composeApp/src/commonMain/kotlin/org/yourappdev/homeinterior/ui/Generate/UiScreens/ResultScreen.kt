@@ -56,7 +56,9 @@ fun ResultScreen(
     val tasksProgress by viewModel.tasksProgress.collectAsState()
     val isTaskRunning = tasksProgress.isNotEmpty() || isFetchingImages
     val state by viewModel.state.collectAsState()
-    val currentBundle = state.generatedImagesEntity.firstOrNull()
+    val selectedBundleId by viewModel.selectedBundleId.collectAsState()
+    val currentBundle = state.generatedImagesEntity.firstOrNull { it.bundleId == selectedBundleId }
+        ?: state.generatedImagesEntity.firstOrNull()
     val currentTaskId = currentBundle?.bundleId
     val currentProgress = tasksProgress[currentTaskId] ?: 0f
     // Bundle Logic
@@ -67,10 +69,10 @@ fun ResultScreen(
 
     val urls = currentBundle?.imageUrls ?: emptyList()
 
-    println("DEBUG_RESULT: isFetchingImages=$isFetchingImages")
-    println("DEBUG_RESULT: paths.size=${paths.size}")
-    println("DEBUG_RESULT: generatedCount=$generatedCount")
-    println("DEBUG_RESULT: currentBundle=$currentBundle")
+    println("DEBUG_PATHS: paths = $paths")
+    println("DEBUG_URLS: urls = $urls")
+    println("DEBUG_BUNDLE: selectedBundleId = $selectedBundleId")
+    println("DEBUG_BUNDLE: currentBundle bundleId = ${currentBundle?.bundleId}")
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -113,7 +115,7 @@ fun ResultScreen(
                 // DOWNLOADED IMAGES
                 itemsIndexed(
                     items = paths,
-                    key = { index, _ -> "image_$index" },
+                    key = { index, path -> "image_${path}_$index" },
                     span = { index, _ ->
                         if ((index + 1) % 3 == 0) StaggeredGridItemSpan.FullLine
                         else StaggeredGridItemSpan.SingleLane

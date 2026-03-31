@@ -6,3 +6,8 @@ expect suspend fun downloadAndCacheImage(
 ): String?
 
 expect fun getImageModel(path: String?): Any?
+
+expect suspend fun saveImageBytes(
+    bytes: ByteArray,
+    fileName: String
+): String?

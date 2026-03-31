@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "53d8a72828671a2767a0155992305cbb",
+    "identityHash": "dd9fca175a7625c6945e2c4f0191c628",
     "entities": [
       {
         "tableName": "drafts",
@@ -59,7 +59,7 @@
       },
       {
         "tableName": "recent_generated",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `localPaths` TEXT NOT NULL, `imageUrls` TEXT NOT NULL, `bundleId` TEXT, `createdAt` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `localPaths` TEXT NOT NULL, `imageUrls` TEXT NOT NULL, `bundleId` TEXT, `createdAt` INTEGER NOT NULL, `originalImagePath` TEXT, `prompt` TEXT, `roomType` TEXT, `style` TEXT, `paletteId` INTEGER)",
         "fields": [
           {
             "fieldPath": "id",
@@ -89,6 +89,31 @@
             "columnName": "createdAt",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "originalImagePath",
+            "columnName": "originalImagePath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "prompt",
+            "columnName": "prompt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "roomType",
+            "columnName": "roomType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "style",
+            "columnName": "style",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "paletteId",
+            "columnName": "paletteId",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -101,7 +126,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '53d8a72828671a2767a0155992305cbb')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'dd9fca175a7625c6945e2c4f0191c628')"
     ]
   }
 }

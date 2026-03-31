@@ -46,3 +46,22 @@ actual fun getImageModel(path: String?): Any? {
         path  // ✅ URL — string as is, File mat banao
     }
 }
+
+actual suspend fun saveImageBytes(
+    bytes: ByteArray,
+    fileName: String
+): String? {
+    return withContext(Dispatchers.IO) {
+        try {
+            val context = GlobalContext.get().get<android.app.Application>()
+            val dir = File(context.filesDir, "generated_images")
+            if (!dir.exists()) dir.mkdirs()
+            val file = File(dir, fileName)
+            file.writeBytes(bytes)
+            file.absolutePath
+        } catch (e: Exception) {
+            println("❌ Save failed: ${e.message}")
+            null
+        }
+    }
+}

@@ -1,6 +1,8 @@
 package org.yourappdev.homeinterior.utils
 
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.Foundation.*
@@ -49,4 +51,35 @@ actual suspend fun downloadAndCacheImage(
 }
 actual fun getImageModel(path: String?): Any? {
     return path
+}
+
+
+@OptIn(ExperimentalForeignApi::class)
+actual suspend fun saveImageBytes(
+    bytes: ByteArray,
+    fileName: String
+): String? {
+    return withContext(Dispatchers.Default) {
+        try {
+            val documentsDir = NSSearchPathForDirectoriesInDomains(
+                NSDocumentDirectory, NSUserDomainMask, true
+            ).first() as String
+            val dir = "$documentsDir/generated_images"
+            NSFileManager.defaultManager.createDirectoryAtPath(
+                dir, withIntermediateDirectories = true,
+                attributes = null, error = null
+            )
+            val filePath = "$dir/$fileName"
+
+            // ✅ ByteArray to NSData
+            val nsData = bytes.usePinned { pinned ->
+                NSData.dataWithBytes(pinned.addressOf(0), bytes.size.toULong())
+            }
+            nsData.writeToFile(filePath, atomically = true)
+            filePath
+        } catch (e: Exception) {
+            println("❌ iOS Save failed: ${e.message}")
+            null
+        }
+    }
 }

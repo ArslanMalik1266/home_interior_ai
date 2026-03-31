@@ -64,7 +64,7 @@ fun CreateScreen(
     onPremiumClick: () -> Unit = {},
     onAddPhotoClick: () -> Unit = {},
     onRoomClick: (RoomUi) -> Unit = {},
-    onShowResults: () -> Unit,
+    onShowResults: (bundleId: String) -> Unit,
     onSeeAllClick: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
@@ -103,7 +103,7 @@ fun CreateScreen(
                 generatedBundles = generatedBundles,
                 onBundleClick = { bundle ->
                     viewModel.onRoomEvent(RoomEvent.ShowSelectedBundle(listOf(bundle)))
-                    onShowResults()
+                    bundle.bundleId?.let { onShowResults(it) }
                 },
                 onSeeAllClick = onSeeAllClick
             )

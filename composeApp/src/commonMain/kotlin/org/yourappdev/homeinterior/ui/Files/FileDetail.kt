@@ -244,9 +244,11 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                             try {
                                 // Null safety check
                                 if (viewModel != null && entity != null) {
-                                    viewModel.deleteRecentImage(entity.id) {
-                                        onClick() // Screen band karke piche chale jayein
-                                    }
+                                    viewModel.deleteImageFromBundle(
+                                        entity = entity,
+                                        imageIndex = selectedIndex,
+                                        onDeleted = { onClick() }
+                                    )
                                 } else {
                                     println("❌ ERROR: ViewModel or Entity is NULL")
                                 }

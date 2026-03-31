@@ -25,6 +25,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
@@ -100,17 +102,21 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
     val roomViewModel: RoomsViewModel = koinViewModel()
     var showGallery by remember { mutableStateOf(false) }
 
+
     val scope = rememberCoroutineScope()
     val tasksStatus by roomViewModel.tasksStatus.collectAsState()
     val tasksProgress by roomViewModel.tasksProgress.collectAsState()
     val roomState by roomViewModel.state.collectAsState()
     val activeTaskIds = remember(tasksProgress) { tasksProgress.keys.toList() }
 
+    val taskQueue by roomViewModel.taskQueue.collectAsState()
     val currentTaskId = remember(tasksStatus) { tasksStatus.keys.firstOrNull() ?: "" }
     val currentStatus = tasksStatus[currentTaskId] ?: GenerationStatus.IDLE
     var showTapToView by remember { mutableStateOf<String?>(null) }
     val displayProgress = if (currentStatus == GenerationStatus.SUCCESS) 1f else (tasksProgress[currentTaskId] ?: 0f)
         var lastTaskId by remember { mutableStateOf<String?>(null) }
+    val activeCount = tasksStatus.count { it.value == GenerationStatus.RUNNING }
+
 
     val shouldShowBottomBar = currentDestination?.route?.let { route ->
         route.contains("Create") ||
@@ -171,13 +177,16 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                         name = stringResource(Res.string.tabThreeFiles),
                         icon = painterResource(Res.drawable.files),
                         selectedIcon = painterResource(Res.drawable.selectedfile),
+                        enableBadge = activeCount > 0,
+                        badgeCount = activeCount,
                         action = {
                             navController.navigate(Routes.Files) {
                                 popUpTo(Routes.Create) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                        }
+                        },
+
                     ),
                     SlippyTab(
                         name = stringResource(Res.string.tabFourProfile),
@@ -210,7 +219,11 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                             enabledIconColor = selectedNavItem,
                             disabledIconColor = unselectedNavItem
                         ),
-                        startIndex = getSelectedTabIndex(currentDestination.route)
+                        startIndex = getSelectedTabIndex(currentDestination.route),
+                        badgeStyle = SlippyBadgeStyle(
+                            backgroundColor = Color(0xFFCCE9A2),
+                            contentColor = Color.White
+                        )
                     ),
                     tabs = tabs,
                     iconSize = 24.dp,
@@ -294,7 +307,8 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                                 )
                             )
                         },
-                        onShowResults = {
+                        onShowResults = { bundleId ->
+                            roomViewModel.selectBundle(bundleId)
                             navController.navigate(Routes.Result)
                         },
                         onSeeAllClick = {
@@ -328,7 +342,8 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                                 Routes.FileEdit(entityId = entityId)
                             )
                         },
-                        onShowResults = {
+                        onShowResults = { bundleId ->
+                            roomViewModel.selectBundle(bundleId)
                             navController.navigate(Routes.Result)
                         }
                     )
@@ -364,15 +379,17 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                     val args = backStackEntry.toRoute<Routes.FileEdit>()
                     val dbImages by roomViewModel.dbGeneratedImages.collectAsState()
                     val state by roomViewModel.state.collectAsState()
+                    val selectedBundleId by roomViewModel.selectedBundleId.collectAsState()
+
 
                     // 1. Pehle ye decide karein ke hum bundle (current generation) dekh rahe hain ya DB se purana data
-                    val entity = remember(args, dbImages, state) {
+                    val entity = remember(args, dbImages, state, selectedBundleId) {
                         when {
                             // Agar generate screen se aa rahe hain (Result Screen bundle)
                             args.imageIndex >= 0 && state.generatedImagesEntity.isNotEmpty() -> {
-                                state.generatedImagesEntity.firstOrNull()
+                                state.generatedImagesEntity.firstOrNull { it.bundleId == selectedBundleId }
+                                    ?: state.generatedImagesEntity.firstOrNull()
                             }
-                            // Agar Files screen se purana record khola hai
                             args.entityId != -1L -> dbImages.find { it.id == args.entityId }
                             else -> null
                         }
@@ -440,6 +457,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                             navController.popBackStack()
                         },
                         onResult = {
+                            roomViewModel.selectBundle(null)
                             navController.navigate(Routes.Result) {
                                 popUpTo(Routes.AbtToGenerate) { inclusive = true }
                             }
@@ -553,13 +571,63 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                     verticalAlignment = Alignment.CenterVertically
                 )
                 {
-                    Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFD4F7BD)), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            progress = { displayProgress },
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = Color(0xFF2C2C2C)
-                        )
+                    BadgedBox(
+                                badge = {
+                            val activeCount = tasksStatus.count { it.value == GenerationStatus.RUNNING }
+                            if (activeCount > 0) {
+                                Badge(
+                                    containerColor = Color(0xFFCCE9A2),
+                                    modifier = Modifier.size(14.dp)
+                                ) {
+                                    Text(
+                                        text = activeCount.toString(),
+                                        fontSize = 8.sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        },
+
+                    ) {
+                        Box(
+                            modifier = Modifier.size(36.dp).clip(CircleShape)
+                                .background(Color(0xFFF2F2F1)), contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(Res.drawable.bottom_box_image),
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            CircularProgressIndicator(
+                                progress = { displayProgress },
+                                modifier = Modifier.size(36.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFFCCE9A2),
+                                trackColor = Color(0xFFF2F2F1)
+                            )
+                            val activeCount =
+                                tasksStatus.count { it.value == GenerationStatus.RUNNING }
+                            if (activeCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 4.dp, y = (-4).dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFCCE9A2)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = activeCount.toString(),
+                                        fontSize = 8.sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
@@ -580,6 +648,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier
                                 .clickable {
+                                    roomViewModel.selectBundle(currentTaskId)
                                     navController.navigate(Routes.Result)
                                     showTapToView = null
                                     roomViewModel.onRoomEvent(RoomEvent.OnGenerationComplete)

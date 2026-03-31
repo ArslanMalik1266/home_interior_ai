@@ -46,6 +46,7 @@ import org.yourappdev.homeinterior.utils.downloadAndCacheImage
 import org.yourappdev.homeinterior.utils.executeApiCall
 import org.yourappdev.homeinterior.utils.getDeviceId
 import org.yourappdev.homeinterior.utils.readLocalFile
+import org.yourappdev.homeinterior.utils.saveImageBytes
 import org.yourappdev.homeinterior.utils.toBase64
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -74,8 +75,17 @@ class RoomsViewModel(
     // Har TaskID ka apna status track karne ke liye
     private val _tasksStatus = MutableStateFlow<Map<String, GenerationStatus>>(emptyMap())
     val tasksStatus = _tasksStatus.asStateFlow()
+    private val _selectedBundleId = MutableStateFlow<String?>(null)
+    val selectedBundleId = _selectedBundleId.asStateFlow()
+
+
+    fun selectBundle(bundleId: String?) {
+        _selectedBundleId.value = bundleId
+    }
     @OptIn(ExperimentalTime::class)
-    val newTaskId = Clock.System.now().toEpochMilliseconds().toString()
+    private fun generateTaskId() = Clock.System.now().toEpochMilliseconds().toString()
+    private val _taskQueue = MutableStateFlow<List<String>>(emptyList())
+    val taskQueue = _taskQueue.asStateFlow()
 
     private val _generationProgress = MutableStateFlow(0f)
     val generationProgress = _generationProgress.asStateFlow()
@@ -209,14 +219,20 @@ class RoomsViewModel(
             }
 
             is RoomEvent.SetImageBytes -> {
-                _state.update {
-                    it.copy(
-                        selectedImageBytes = event.bytes,
-                        selectedFileName = event.fileName,
-                        selectedImage = "image_picked",
-                        currentTaskId = null,
-                        isFetchingImages = false
+                viewModelScope.launch {
+                    val savedPath = saveImageBytes(
+                        bytes = event.bytes,
+                        fileName = "original_${generateTaskId()}.jpg"
                     )
+                    _state.update {
+                        it.copy(
+                            selectedImageBytes = event.bytes,
+                            selectedFileName = savedPath ?: event.fileName,
+                            selectedImage = "image_picked",
+                            currentTaskId = null,
+                            isFetchingImages = false
+                        )
+                    }
                 }
             }
 
@@ -349,7 +365,7 @@ class RoomsViewModel(
             }
 
             is RoomEvent.OnGenerateClick -> {
-                val newTaskId = Clock.System.now().toEpochMilliseconds().toString()
+                val newTaskId = generateTaskId()
                 _tasksStatus.update { it + (newTaskId to GenerationStatus.RUNNING) }
                 _tasksProgress.update { it + (newTaskId to 0.0f) }
                 val capturedPrompt = buildPromptFromState(_state.value)
@@ -432,10 +448,9 @@ class RoomsViewModel(
                                 kotlinx.coroutines.delay(1000L)
                                 val progress = (seconds.toFloat() / maxEta.toFloat()).coerceAtMost(0.99f)
                                 _tasksProgress.update { it + (newTaskId to progress) }
-
-                                // Agar task khatam ho jaye to timer rok dein
-                                val isStillActive = _tasksProgress.value.containsKey(newTaskId)
-                                if (!isStillActive) break                            }
+                                val currentStatus = _tasksStatus.value[newTaskId]
+                                if (currentStatus == GenerationStatus.SUCCESS || !_tasksStatus.value.containsKey(newTaskId)) break
+                            }
                         }
 
                         val allGeneratedUrls = mutableListOf<String>()
@@ -476,11 +491,19 @@ class RoomsViewModel(
                                                     }
                                                     if (successCount >= 3) {
                                                         // Bundle Complete! Save to DB
-                                                        val bundleToSave = RecentGeneratedEntity(
+                                                        val     bundleToSave = RecentGeneratedEntity(
                                                             imageUrls = allGeneratedUrls.toList(),
                                                             localPaths = allLocalPaths.toList(),
-                                                            bundleId = newTaskId
+                                                            bundleId = newTaskId,
+                                                            originalImagePath = _state.value.selectedFileName,
+                                                            prompt = capturedPrompt,
+                                                            roomType = _state.value.selectedRoomType,
+                                                            style = _state.value.selectedStyleName,
+                                                            paletteId = _state.value.selectedPaletteId
                                                         )
+                                                        println("DEBUG_BUNDLE_SAVE: originalImagePath = ${bundleToSave.originalImagePath}")
+                                                        println("DEBUG_BUNDLE_SAVE: prompt = ${bundleToSave.prompt}")
+                                                        println("DEBUG_BUNDLE_SAVE: roomType = ${bundleToSave.roomType}")
                                                         recentGeneratedRepository.saveGenerated(bundleToSave)
 
                                                         // Clean up this task
@@ -509,39 +532,45 @@ class RoomsViewModel(
                 }
             }
             is RoomEvent.OnCancelGeneration -> {
-                generationJobs[event.taskId]?.cancel()
-                generationJobs.remove(event.taskId)
+                val taskId = event.taskId
 
+                // Sirf is task ki job cancel karo
+                generationJobs[taskId]?.cancel()
+                generationJobs.remove(taskId)
 
-                _state.update { it.copy(
-                    isGenerating = false,
-                    isFetchingImages = false,
-                    generationStatus = GenerationStatus.IDLE,
-                    activeTasksCount = (it.activeTasksCount - 1).coerceAtLeast(0)
-                )}
+                // Sirf is task ko maps se remove karo
+                _tasksProgress.update { it - taskId }
+                _tasksStatus.update { it - taskId }
 
-                // ✅ Sirf is task ko remove karo
-                _tasksProgress.update { it - event.taskId }
-                _tasksStatus.update { it - event.taskId }
+                // Sirf is task ki entity remove karo, baaki rehne do
+                _state.update {
+                    it.copy(
+                        activeTasksCount = (it.activeTasksCount - 1).coerceAtLeast(0),
+                        generatedImagesEntity = it.generatedImagesEntity.filter { e -> e.bundleId != taskId }
+                    )
+                }
             }
+
             is RoomEvent.OnGenerationComplete -> {
-                _tasksProgress.update { emptyMap() }
+                // Sirf UI state reset karo (selection etc.)
+                // Generating bundles mat chhuao
                 _state.update {
                     it.copy(
                         selectedImageBytes = null,
                         selectedFileName = null,
                         selectedImage = null,
                         generatedImages = emptyList(),
-                        generatedImagesEntity = emptyList(),
                         isGenerating = false,
                         selectedRoomType = null,
-                        isFetchingImages = false,
+                        isFetchingImages = it.activeTasksCount > 0, // agar aur tasks hain to true rakho
                         generatedCount = 0,
                         selectedStyleName = null,
                         selectedPaletteId = null,
                         currentPage = 0
+                        // ❌ generatedImagesEntity = emptyList() -- yeh hatao
                     )
                 }
+                // ❌ _tasksProgress.update { emptyMap() } -- yeh bhi hatao
             }
             is RoomEvent.ShowSelectedBundle -> {
                 _state.update {
@@ -806,92 +835,128 @@ No text, no watermark, no typography""".trimIndent()
     @OptIn(ExperimentalTime::class)
     fun redoGeneration(
         entity: RecentGeneratedEntity,
-        indexToReplace: Int, // Naya parameter takay pata ho konsi image badalni hai
+        indexToReplace: Int,
         onResult: () -> Unit
     ) {
         viewModelScope.launch {
-            // 1. Sirf wo image bytes uthao jise redo karna hai
-            val targetPath = entity.localPaths.getOrNull(indexToReplace)
-            val imageBytes = if (targetPath != null) {
-                try { readLocalFile(targetPath) } catch (e: Exception) { null }
-            } else null
+            val latestEntity = _state.value.generatedImagesEntity
+                .firstOrNull { it.bundleId == entity.bundleId }
+                ?: entity
+            // 1. Original image bytes lo
+            val imageBytes = latestEntity.originalImagePath?.let {
+                try { readLocalFile(it) } catch (e: Exception) { null }
+            }
 
             if (imageBytes == null || imageBytes.isEmpty()) {
-                println("❌ Redo: No image bytes found for index $indexToReplace")
+                _uiEvent.emit(ShowError("Original image not found"))
                 return@launch
             }
 
-            // 2. UI State update (Loading dikhane ke liye)
-            _state.update {
-                it.copy(
-                    isGenerating = true,
-                    isFetchingImages = false,
-                    errorMessage = null
-                )
-            }
+            // 2. Task ID banao — FIFO queue mein add karo
+            val taskId = generateTaskId()
+            _taskQueue.update { it + taskId }
+            _tasksStatus.update { it + (taskId to GenerationStatus.RUNNING) }
+            _tasksProgress.update { it + (taskId to 0f) }
+
+            // 3. Result screen pe jao
             onResult()
 
-            // 3. Credits check aur Generation (Same purana process)
-            val email = authViewModel.state.value.email ?: ""
-            val deviceId = getDeviceId()
-            val creditResult = if (email.isBlank()) {
-                spendCreditsUseCaseGuest(deviceId = deviceId, amount = 1)
-            } else {
-                spendCreditsUseCase(userEmail = email, deviceId = deviceId, amount = 1)
-            }
+            // 4. Generation
+            generationJobs[taskId] = viewModelScope.launch {
+                try {
+                    val email = authViewModel.state.value.email ?: ""
+                    val deviceId = getDeviceId()
+                    val creditResult = if (email.isBlank()) {
+                        spendCreditsUseCaseGuest(deviceId, 1)
+                    } else {
+                        spendCreditsUseCase(email, deviceId, 1)
+                    }
 
-            if (creditResult.isFailure) {
-                _state.update { it.copy(isGenerating = false, errorMessage = "Not enough credits") }
-                return@launch
-            }
+                    if (creditResult.isFailure) {
+                        _taskQueue.update { it - taskId }
+                        _tasksStatus.update { it - taskId }
+                        _tasksProgress.update { it - taskId }
+                        _uiEvent.emit(ShowError("Not enough credits"))
+                        return@launch
+                    }
 
-            val base64Image = "data:image/jpeg;base64,${imageBytes.toBase64()}"
-            val prompt = buildPromptFromState(_state.value)
-            val request = GenerateRoomRequest(initImage = base64Image, prompt = prompt)
+                    // ✅ Entity ka prompt use karo — current state ka nahi
+                    val base64Image = "data:image/jpeg;base64,${imageBytes.toBase64()}"
+                    val prompt = entity.prompt ?: buildPromptFromState(_state.value)
+                    val request = GenerateRoomRequest(initImage = base64Image, prompt = prompt)
 
-            val result = generateRoomUseCase(request)
+                    val result = generateRoomUseCase(request)
 
-            if (result is ResultState.Success && result.data.fetchUrl != null) {
-                _state.update { it.copy(isGenerating = false, isFetchingImages = true) }
+                    if (result is ResultState.Success && result.data.fetchUrl != null) {
+                        val eta = result.data.eta ?: 30
 
-                var retries = 0
-                while (retries < 20) {
-                    val fetchResult = fetchGeneratedRoomUseCase(result.data.fetchUrl!!)
-                    if (fetchResult is ResultState.Success) {
-                        val data = fetchResult.data
-                        if (!data.isProcessing && data.availableImages.isNotEmpty()) {
-
-                            val newUrl = data.availableImages.first()
-                            val newPath = downloadAndCacheImage(newUrl, "redo_idx${indexToReplace}_${Clock.System.now().toEpochMilliseconds()}.jpg")
-
-                            // ✅ MAIN LOGIC: Purani list lo aur sirf target index update karo
-                            val updatedUrls = entity.imageUrls.toMutableList().apply {
-                                if (size > indexToReplace) set(indexToReplace, newUrl)
+                        // Progress timer
+                        launch {
+                            for (seconds in 1..200) {
+                                kotlinx.coroutines.delay(1000L)
+                                val progress = (seconds.toFloat() / eta.toFloat()).coerceAtMost(0.99f)
+                                _tasksProgress.update { it + (taskId to progress) }
+                                val status = _tasksStatus.value[taskId]
+                                if (status == GenerationStatus.SUCCESS || !_tasksStatus.value.containsKey(taskId)) break
                             }
-                            val updatedPaths = entity.localPaths.toMutableList().apply {
-                                if (size > indexToReplace) set(indexToReplace, newPath ?: "")
+                        }
+
+                        var retries = 0
+                        while (retries < 30) {
+                            val fetchResult = fetchGeneratedRoomUseCase(result.data.fetchUrl!!)
+                            if (fetchResult is ResultState.Success) {
+                                val data = fetchResult.data
+                                if (!data.isProcessing && data.availableImages.isNotEmpty()) {
+                                    val newUrl = data.availableImages.first()
+                                    val newPath = downloadAndCacheImage(newUrl, "redo_${taskId}_$indexToReplace.jpg")
+
+                                    // ✅ Sirf target index replace karo
+                                    val updatedUrls = entity.imageUrls.toMutableList().apply {
+                                        if (size > indexToReplace) set(indexToReplace, newUrl)
+                                    }
+                                    val updatedPaths = entity.localPaths.toMutableList().apply {
+                                        if (size > indexToReplace) set(indexToReplace, newPath ?: "")
+                                    }
+
+                                    val updatedBundle = entity.copy(
+                                        imageUrls = updatedUrls,
+                                        localPaths = updatedPaths
+                                    )
+
+                                    // DB update
+                                    recentGeneratedRepository.saveGenerated(updatedBundle)
+
+                                    // State update
+                                    _state.update { s ->
+                                        s.copy(
+                                            generatedImagesEntity = s.generatedImagesEntity.map { e ->
+                                                if (e.bundleId == entity.bundleId) updatedBundle else e
+                                            }
+                                        )
+                                    }
+
+                                    // SUCCESS
+                                    _tasksProgress.update { it + (taskId to 1f) }
+                                    _tasksStatus.update { it + (taskId to GenerationStatus.SUCCESS) }
+
+                                    delay(5000L)
+                                    _taskQueue.update { it - taskId }
+                                    _tasksStatus.update { it - taskId }
+                                    _tasksProgress.update { it - taskId }
+                                    generationJobs.remove(taskId)
+                                    break
+                                }
                             }
-
-                            // ✅ DB UPDATE: Purana record delete nahi hoga, sirf data replace hoga
-                            val updatedBundle = entity.copy(
-                                imageUrls = updatedUrls,
-                                localPaths = updatedPaths
-                            )
-                            recentGeneratedRepository.saveGenerated(updatedBundle)
-
-                            // 4. Result screen ko updated bundle dikhao
-                            _state.update { it.copy(
-                                isFetchingImages = false,
-                                generatedImagesEntity = listOf(updatedBundle)
-                            )}
-                            break
+                            retries++
+                            kotlinx.coroutines.delay(5000L)
                         }
                     }
-                    retries++
-                    kotlinx.coroutines.delay(5000L)
+                } catch (e: Exception) {
+                    _taskQueue.update { it - taskId }
+                    _tasksStatus.update { it - taskId }
+                    _tasksProgress.update { it - taskId }
+                    generationJobs.remove(taskId)
                 }
-            } else {
-                _state.update { it.copy(isGenerating = false) }
             }
         }
     }
@@ -918,6 +983,36 @@ No text, no watermark, no typography""".trimIndent()
     }
     fun prepareForNewGeneration() {
         _state.update { it.copy(isFetchingImages = false) }
+    }
+
+    fun deleteImageFromBundle(entity: RecentGeneratedEntity, imageIndex: Int, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                val updatedUrls = entity.imageUrls.toMutableList().apply { removeAt(imageIndex) }
+                val updatedPaths = entity.localPaths.toMutableList().apply { removeAt(imageIndex) }
+
+                val updatedBundle = entity.copy(
+                    imageUrls = updatedUrls,
+                    localPaths = updatedPaths
+                )
+
+                if (updatedUrls.isEmpty()) {
+                    recentGeneratedRepository.deleteGeneratedById(entity.id)
+                } else {
+                    recentGeneratedRepository.saveGenerated(updatedBundle)
+                }
+                _state.update { s ->
+                    s.copy(
+                        generatedImagesEntity = s.generatedImagesEntity.map { e ->
+                            if (e.bundleId == entity.bundleId) updatedBundle else e
+                        }
+                    )
+                }
+                onDeleted()
+            } catch (e: Exception) {
+                _uiEvent.emit(CommonUiEvent.ShowError("Delete failed"))
+            }
+        }
     }
 
 

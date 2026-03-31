@@ -41,7 +41,7 @@ fun FilesScreen(
     viewModel: RoomsViewModel = koinViewModel(),
     navController: androidx.navigation.NavController,
     onImageClick: (Long) -> Unit,
-    onShowResults: () -> Unit
+    onShowResults: (bundleId: String) -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     val tasksProgress by viewModel.tasksProgress.collectAsState()
@@ -140,7 +140,7 @@ fun FilesScreen(
                         tasksProgress = tasksProgress,
                             onBundleClick = { selectedBundle ->
                                 viewModel.onRoomEvent(RoomEvent.ShowSelectedBundle(listOf(selectedBundle)))
-                                onShowResults()
+                                selectedBundle.bundleId?.let { onShowResults(it) }
                             }
                         )
                 }

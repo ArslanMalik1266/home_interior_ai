@@ -14,5 +14,10 @@ data class RecentGeneratedEntity @OptIn(ExperimentalTime::class) constructor(
     val localPaths: List<String> = emptyList(),
     val imageUrls: List<String> = emptyList(),
     val bundleId: String? = null,
-    val createdAt: Long = Clock.System.now().toEpochMilliseconds()
+    val createdAt: Long = Clock.System.now().toEpochMilliseconds(),
+    val originalImagePath: String? = null,
+    val prompt: String? = null,
+    val roomType: String? = null,
+    val style: String? = null,
+    val paletteId: Int? = null
 )
