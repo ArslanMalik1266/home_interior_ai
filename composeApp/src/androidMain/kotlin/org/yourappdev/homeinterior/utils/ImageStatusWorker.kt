@@ -5,42 +5,56 @@ import android.content.Context
 import androidx.annotation.RequiresPermission
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import androidx.work.workDataOf
+import kotlinx.coroutines.delay
+import org.yourappdev.homeinterior.domain.usecase.FetchGeneratedRoomUseCase
+import org.yourappdev.homeinterior.data.remote.util.ResultState
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 class ImageStatusWorker(
     context: Context,
     params: WorkerParameters
-) : CoroutineWorker(context, params) {
+) : CoroutineWorker(context, params), KoinComponent {
+
+    private val fetchGeneratedRoomUseCase: FetchGeneratedRoomUseCase by inject()
 
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     override suspend fun doWork(): Result {
-        // ✅ 1. Sab se pehle log check karein
-        println("🚀 WORKER_DEBUG: Background Worker Trigger ho gaya!")
+        val taskId = inputData.getString("TASK_ID") ?: return Result.failure()
+        val fetchUrls = inputData.getStringArray("FETCH_URLS")?.toList() ?: return Result.failure()
 
-        // ✅ 2. Task ID nikalain (Keys Case-Sensitive hain: "TASK_ID")
-        val taskId = inputData.getString("TASK_ID")
-        println("WORKER_DEBUG: Worker started running for Task ID: $taskId")
+        println("🚀 WORKER: Started taskId=$taskId urls=$fetchUrls")
 
-        if (taskId == null) {
-            println("❌ WORKER_DEBUG: Task ID missing hai!")
-            return Result.failure()
-        }
+        var allDone = false
+        var retries = 0
 
-        println("📌 WORKER_DEBUG: Task [ $taskId ] process ho raha hai...")
-
-        return try {
-            // ✅ 3. Background Notification Logic
-            if (NotificationManager.isAppInBackground()) {
-                println("✨ WORKER_DEBUG: Notification bhej raha hoon...")
-                NotificationManager.notifyIfBackground()
-            } else {
-                println("📱 WORKER_DEBUG: App foreground mein hai, notification skip.")
+        while (retries < 30 && !allDone) {
+            var readyCount = 0
+            fetchUrls.forEach { url ->
+                val result = fetchGeneratedRoomUseCase(url)
+                if (result is ResultState.Success) {
+                    val data = result.data
+                    if (!data.isProcessing && data.availableImages.isNotEmpty()) {
+                        readyCount++
+                        println("✅ WORKER: Image ready from $url")
+                    }
+                }
             }
-
-            Result.success()
-        } catch (e: Exception) {
-            println("⚠️ WORKER_DEBUG: Error: ${e.message}")
-            Result.retry()
+            if (readyCount >= fetchUrls.size) {
+                allDone = true
+            } else {
+                retries++
+                delay(5000L)
+            }
         }
+
+        // Notification show karo
+        NotificationManager.initialize()
+        if (NotificationManager.isAppInBackground()) {
+            NotificationManager.notifyIfBackground()
+        }
+
+        println("✅ WORKER: Done! Notification sent.")
+        return Result.success()
     }
 }

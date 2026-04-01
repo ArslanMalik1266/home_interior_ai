@@ -1,49 +1,63 @@
 import SwiftUI
 import BackgroundTasks
 import UserNotifications
-import ComposeApp // Aapka KMP module name
+import ComposeApp
 
-// 1. Notification setup ke liye class
 class AppDelegate: NSObject, UIApplicationDelegate {
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-
-        // ✅ Fix 1: currentNotificationCenter() → current()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
-            if granted {
-                print("Notification Permission Granted ✅")
-            }
+            print(granted ? "✅ Notification Permission Granted" : "❌ Denied")
         }
 
-        // ✅ Fix 2: BGTaskScheduler (BackgroundTasks framework import se ab kaam karega)
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: "org.yourappdev.homeinterior.checkStatus", using: nil) { task in
-            self.handleBackgroundTask(task: task as! BGAppRefreshTask)
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: "org.yourappdev.homeinterior.imageProcessing",
+            using: nil
+        ) { task in
+            self.handleImageProcessingTask(task: task as! BGProcessingTask)
         }
-
         return true
     }
 
-    func handleBackgroundTask(task: BGAppRefreshTask) {
-        // Kotlin ka UseCase ya Repository yahan call hogi
-        // Task khatam hone par task.setTaskCompleted(success: true) lazmi karna hota hai
-        task.setTaskCompleted(success: true)
+    func handleImageProcessingTask(task: BGProcessingTask) {
+        print("🚀 BGProcessingTask started!")
+
+        // Pending fetchUrls UserDefaults se lo
+        let fetchUrls = UserDefaults.standard.stringArray(forKey: "PENDING_FETCH_URLS") ?? []
+        print("📋 Fetch URLs: \(fetchUrls)")
+
+        if fetchUrls.isEmpty {
+            task.setTaskCompleted(success: true)
+            return
+        }
+
+        task.expirationHandler = {
+            print("⚠️ BGProcessingTask expired!")
+            task.setTaskCompleted(success: false)
+        }
+
+        // Kotlin ImageCheckHelper call karo
+        let helper = ImageCheckHelper()
+        helper.checkAndNotify(fetchUrls: fetchUrls) {
+            UserDefaults.standard.removeObject(forKey: "PENDING_FETCH_URLS")
+            task.setTaskCompleted(success: true)
+            print("✅ BGProcessingTask completed!")
+        }
     }
 }
 
 @main
 struct iOSApp: App {
-    // 2. AppDelegate ko SwiftUI se connect karna
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
 
     init() {
-        // ✅ Fix 3: Shared framework build hone ke baad yeh kaam karega
         KoinHelper().doInitKoin()
     }
 
     var body: some Scene {
         WindowGroup {
-            // 3. KMP ka UI yahan load hoga
             ContentView()
-                .ignoresSafeArea(.all) // Full screen view ke liye
+                .ignoresSafeArea(.all)
         }
     }
 }

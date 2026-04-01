@@ -89,11 +89,11 @@ actual object NotificationManager {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info) // Using standard system icon for testing
-            .setContentTitle("✨ Image Ready!")
-            .setContentText("Your interior image has been successfully generated!")
+            .setContentTitle("Interior Design Ready")
+            .setContentText("Your design is ready. Tap to view.")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("Your interior design is ready! Tap to view your generated space. 🏠")
+                    .bigText("Your AI-generated interior design is complete. Tap to explore and download your new space.")
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)

@@ -15,8 +15,8 @@ actual object NotificationManager {
     actual fun notifyIfBackground() {
         if (isAppInBackground()) {
             val content = UNMutableNotificationContent().apply {
-                setTitle("Design Ready!")
-                setBody("Aapka naya home interior design taiyar hai.")
+                setTitle("Your Design is Ready!")
+                setBody("Your AI interior design is ready to view.")
                 setSound(UNNotificationSound.defaultSound)
             }
 

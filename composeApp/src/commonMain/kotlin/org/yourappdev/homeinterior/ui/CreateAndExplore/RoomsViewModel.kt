@@ -463,6 +463,7 @@ class RoomsViewModel(
                             if (result is ResultState.Success) {
                                 val response = result.data
                                 if (response.isProcessing && response.fetchUrl != null) {
+                                    startImageTrackingUseCase(newTaskId, (maxEta * 0.8).toLong(), results.filter { it is ResultState.Success }.mapNotNull { (it as ResultState.Success).data.fetchUrl })
                                     launch {
                                         var retries = 0
                                         while (retries < 30) {
@@ -506,6 +507,7 @@ class RoomsViewModel(
                                                         println("DEBUG_BUNDLE_SAVE: prompt = ${bundleToSave.prompt}")
                                                         println("DEBUG_BUNDLE_SAVE: roomType = ${bundleToSave.roomType}")
                                                         recentGeneratedRepository.saveGenerated(bundleToSave)
+                                                        if (NotificationManager.isAppInBackground()) { NotificationManager.notifyIfBackground() }
 
                                                         // Clean up this task
                                                         _tasksStatus.update { it + (newTaskId to GenerationStatus.SUCCESS) }

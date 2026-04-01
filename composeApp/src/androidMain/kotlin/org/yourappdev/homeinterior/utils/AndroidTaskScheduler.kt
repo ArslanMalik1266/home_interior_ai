@@ -1,31 +1,24 @@
 package org.yourappdev.homeinterior.utils
 
 import android.content.Context
-import androidx.work.Constraints
-import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
+import androidx.work.*
 import java.util.concurrent.TimeUnit
 
 class AndroidTaskScheduler(private val context: Context) : BackgroundTaskScheduler {
-
-
-    override fun scheduleImageStatusCheck(taskId: String, delaySeconds: Long) {
-        println("WORKER_DEBUG: Scheduling task for ID: $taskId with delay: $delaySeconds seconds")
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED) // Internet hona zaroori hai
-            .build()
-
+    override fun scheduleImageStatusCheck(taskId: String, delaySeconds: Long, fetchUrls: List<String>) {
         val data = Data.Builder()
             .putString("TASK_ID", taskId)
+            .putStringArray("FETCH_URLS", fetchUrls.toTypedArray())
             .build()
 
         val workRequest = OneTimeWorkRequestBuilder<ImageStatusWorker>()
-            .setInitialDelay(delaySeconds, TimeUnit.SECONDS) // ETA ka wait karega
-            .setConstraints(constraints)
+            .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
             .setInputData(data)
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
@@ -33,6 +26,6 @@ class AndroidTaskScheduler(private val context: Context) : BackgroundTaskSchedul
             ExistingWorkPolicy.REPLACE,
             workRequest
         )
-        println("WORKER_DEBUG: WorkRequest enqueued successfully for $taskId")
+        println("✅ WorkManager scheduled for taskId: $taskId, delay: ${delaySeconds}s")
     }
 }
