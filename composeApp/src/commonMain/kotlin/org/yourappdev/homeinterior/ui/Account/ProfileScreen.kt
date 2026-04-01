@@ -186,13 +186,13 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             ProfileHeader(
-                email = user?.userEmail ?: "No Email"
+                email = user?.userEmail ?: "Guest User"
             )
 
             Spacer(modifier = Modifier.height(60.dp))
 
             ProfileMenuItems(
-                email = user?.userEmail ?: "No Email",
+                email = user?.userEmail ?: "Guest User",
                 isLoggedIn = isLoggedIn,
                 onLogoutClick = { showLogoutDialog = true },
                 onLoginClick = { onLoginClick() }

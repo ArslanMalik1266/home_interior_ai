@@ -67,6 +67,8 @@ class RoomsViewModel(
     private val startImageTrackingUseCase: StartImageTrackingUseCase,
 ) : ViewModel() {
     private val listLock = Mutex()
+
+
     private val generationJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
     private val _state = MutableStateFlow(RoomUiState())
     val state: StateFlow<RoomUiState> = _state.asStateFlow()
@@ -82,6 +84,9 @@ class RoomsViewModel(
     fun selectBundle(bundleId: String?) {
         _selectedBundleId.value = bundleId
     }
+
+    private val _isDbLoaded = MutableStateFlow(false)
+    val isDbLoaded = _isDbLoaded.asStateFlow()
     @OptIn(ExperimentalTime::class)
     private fun generateTaskId() = Clock.System.now().toEpochMilliseconds().toString()
     private val _taskQueue = MutableStateFlow<List<String>>(emptyList())
@@ -176,17 +181,13 @@ class RoomsViewModel(
     init {
         getRooms()
         viewModelScope.launch {
-            println("🟢 FETCH_FLOW: Starting to observe database...")
             dbGeneratedImages.collect { images ->
-                println("🟢 FETCH_FLOW: Database changed! Total records = ${images.size}")
-
+                _isDbLoaded.value = true
                 if (images.isEmpty()) {
                     println("🟢 FETCH_FLOW: ⚠️ Database is EMPTY")
                 } else {
                     images.forEachIndexed { index, entity ->
-                        println("🟢 FETCH_FLOW: [$index] -----------------")
-                        println("🟢 FETCH_FLOW:   - ID = ${entity.id}")
-                        println("🟢 FETCH_FLOW:   - Created at = ${entity.createdAt}")
+                        println("🟢 FETCH_FLOW: [$index] ID = ${entity.id}")
                     }
                 }
             }
@@ -882,7 +883,7 @@ No text, no watermark, no typography""".trimIndent()
 
                     // ✅ Entity ka prompt use karo — current state ka nahi
                     val base64Image = "data:image/jpeg;base64,${imageBytes.toBase64()}"
-                    val prompt = entity.prompt ?: buildPromptFromState(_state.value)
+                    val prompt = latestEntity.prompt ?: buildPromptFromState(_state.value)
                     val request = GenerateRoomRequest(initImage = base64Image, prompt = prompt)
 
                     val result = generateRoomUseCase(request)
@@ -909,16 +910,19 @@ No text, no watermark, no typography""".trimIndent()
                                 if (!data.isProcessing && data.availableImages.isNotEmpty()) {
                                     val newUrl = data.availableImages.first()
                                     val newPath = downloadAndCacheImage(newUrl, "redo_${taskId}_$indexToReplace.jpg")
+                                    val currentEntity = _state.value.generatedImagesEntity
+                                        .firstOrNull { it.bundleId == entity.bundleId }
+                                        ?: entity
 
                                     // ✅ Sirf target index replace karo
-                                    val updatedUrls = entity.imageUrls.toMutableList().apply {
+                                    val    updatedUrls = currentEntity.imageUrls.toMutableList().apply {
                                         if (size > indexToReplace) set(indexToReplace, newUrl)
                                     }
-                                    val updatedPaths = entity.localPaths.toMutableList().apply {
+                                    val updatedPaths = currentEntity.localPaths.toMutableList().apply {
                                         if (size > indexToReplace) set(indexToReplace, newPath ?: "")
                                     }
 
-                                    val updatedBundle = entity.copy(
+                                    val updatedBundle = currentEntity.copy(
                                         imageUrls = updatedUrls,
                                         localPaths = updatedPaths
                                     )

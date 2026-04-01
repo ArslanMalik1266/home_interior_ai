@@ -80,12 +80,24 @@ class AuthViewModel(private val verifyOtpUseCase: VerifyOtpUseCase,
                 is ResultState.Success -> {
 
                     val session = result.data
-                    _guestSession.value = session
-                    _state.update {
-                        it.copy(
-                            freeCredits = session.freeCredits,
-                            totalCredits = session.totalCredits
-                        )
+                    if (!session.isNew && session.user.userEmail != null) {
+                        settings.putString("user_email", session.user.userEmail!!)
+                        _state.update {
+                            it.copy(
+                                email = session.user.userEmail!!,
+                                freeCredits = session.freeCredits,
+                                totalCredits = session.totalCredits
+                            )
+                        }
+                        fetchUserDetails()
+                    } else {
+                        _guestSession.value = session
+                        _state.update {
+                            it.copy(
+                                freeCredits = session.freeCredits,
+                                totalCredits = session.totalCredits
+                            )
+                        }
                     }
                     println("DEBUG_GUEST: Registered! Credits: ${session.freeCredits}, isNew: ${session.isNew}")
                 }

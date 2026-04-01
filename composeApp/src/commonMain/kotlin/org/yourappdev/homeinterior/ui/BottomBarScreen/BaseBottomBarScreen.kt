@@ -124,13 +124,36 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                 route.contains("Explore") ||
                 route.contains("Account")
     } ?: false
+    LaunchedEffect(currentDestination?.route) {
+        val index = getSelectedTabIndex(currentDestination?.route)
+        SlippyOptions.currentPage.value = index
+    }
     val isRunning = shouldShowBottomBar && currentTaskId.isNotEmpty() && currentStatus != GenerationStatus.IDLE
+    val waitingMessages = listOf(
+        "Almost there..",
+        "Finalizing details..",
+        "Adding finishing touches..",
+        "Just a moment more..",
+        "Polishing your design..",
+        "Worth the wait.."
+    )
+    var waitingMessageIndex by remember { mutableStateOf(0) }
+
+    LaunchedEffect(displayProgress >= 0.99f) {
+        if (displayProgress >= 0.99f) {
+            while (true) {
+                delay(5000L)
+                waitingMessageIndex = (waitingMessageIndex + 1) % waitingMessages.size
+            }
+        }
+    }
     val loadingText = when (currentStatus) {
         GenerationStatus.SUCCESS -> "Completed."
         GenerationStatus.RUNNING -> {
             when {
                 displayProgress < 0.4f -> "Getting things ready.."
                 displayProgress < 0.9f -> "Creating your image.."
+                displayProgress >= 0.99f -> waitingMessages[waitingMessageIndex]
                 else -> "Almost there.."
             }
         }
@@ -531,13 +554,14 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                         },
                         onLogoutSuccess = {
                             rootNavController.navigate(Routes.Login) {
-                                popUpTo(0) { inclusive = true }
+                                popUpTo(Routes.BaseAppScreen) { inclusive = false }
                                 launchSingleTop = true
                             }
                         },
                         onLoginClick = {
                             rootNavController.navigate(Routes.Login) {
                                 launchSingleTop = true
+
                             }
                         }
                     )
@@ -560,7 +584,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                         )
                         .background(
                             color = Color(0xFFFFFFFF),
-                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
                         )
                         .padding(
                             start = 16.dp,

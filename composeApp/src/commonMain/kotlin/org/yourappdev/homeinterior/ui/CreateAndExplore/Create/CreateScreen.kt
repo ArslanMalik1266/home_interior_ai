@@ -69,6 +69,8 @@ fun CreateScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val dbImages by viewModel.dbGeneratedImages.collectAsState()
+    val isDbLoaded by viewModel.isDbLoaded.collectAsState()
+
 
     LaunchedEffect(dbImages) {
         println("🟣 UI_CREATE: dbImages count = ${dbImages.size}")
@@ -105,7 +107,8 @@ fun CreateScreen(
                     viewModel.onRoomEvent(RoomEvent.ShowSelectedBundle(listOf(bundle)))
                     bundle.bundleId?.let { onShowResults(it) }
                 },
-                onSeeAllClick = onSeeAllClick
+                onSeeAllClick = onSeeAllClick,
+                isDbLoaded = isDbLoaded
             )
         }
     }
@@ -280,8 +283,10 @@ private fun RoomCategoryCard(room: RoomUi, height: androidx.compose.ui.unit.Dp, 
 private fun RecentFilesSection(
     generatedBundles: List<RecentGeneratedEntity>,  // ✅ Change type here
     onBundleClick: (RecentGeneratedEntity) -> Unit,  // ✅ Correct type
-    onSeeAllClick: () -> Unit
+    onSeeAllClick: () -> Unit,
+    isDbLoaded: Boolean
 ) {
+
     Column(modifier = Modifier.padding(bottom = 30.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
@@ -306,7 +311,8 @@ private fun RecentFilesSection(
         Spacer(modifier = Modifier.height(12.dp))
         RecentFilesRow(
             generatedBundles = generatedBundles,  // ✅ Matches parameter name
-            onBundleClick = onBundleClick          // ✅ Matches parameter name
+            onBundleClick = onBundleClick   ,
+            isLoading = !isDbLoaded
         )
     }
 }
@@ -314,7 +320,8 @@ private fun RecentFilesSection(
 @Composable
 private fun RecentFilesRow(
     generatedBundles: List<RecentGeneratedEntity>,  // ✅ Change type here
-    onBundleClick: (RecentGeneratedEntity) -> Unit // ✅ Callback parameter
+    onBundleClick: (RecentGeneratedEntity) -> Unit, // ✅ Callback parameter
+    isLoading: Boolean = true
 ) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -345,7 +352,8 @@ private fun RecentFilesRow(
                     }
                 }
             }
-        } else {
+        }
+        else if (isLoading) {
             items(3) {
                 Box(
                     modifier = Modifier
@@ -354,6 +362,24 @@ private fun RecentFilesRow(
                         .background(Color(0xFFF5F5F5))
                         .shimmerLoading()
                 )
+            }
+        }
+        else {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillParentMaxWidth()
+                        .height(114.dp)
+                        .padding(horizontal = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No recent files yet",
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

@@ -39,6 +39,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
 import org.yourappdev.homeinterior.ui.CreateAndExplore.RoomsViewModel
 import org.yourappdev.homeinterior.ui.UiUtils.CloseIconButton
+import org.yourappdev.homeinterior.utils.GenerationStatus
 import org.yourappdev.homeinterior.utils.getImageModel
 
 @Composable
@@ -52,22 +53,19 @@ fun ResultScreen(
     generatedCount: Int = 3,
     onImageClick: (Int) -> Unit
 ) {
-    val scrollState = rememberScrollState()
     val tasksProgress by viewModel.tasksProgress.collectAsState()
-    val isTaskRunning = tasksProgress.isNotEmpty() || isFetchingImages
     val state by viewModel.state.collectAsState()
     val selectedBundleId by viewModel.selectedBundleId.collectAsState()
     val currentBundle = state.generatedImagesEntity.firstOrNull { it.bundleId == selectedBundleId }
         ?: state.generatedImagesEntity.firstOrNull()
     val currentTaskId = currentBundle?.bundleId
     val currentProgress = tasksProgress[currentTaskId] ?: 0f
-    // Bundle Logic
-    val tempImages = state.generatedImagesEntity.firstOrNull()
-
-
     val paths = currentBundle?.localPaths ?: emptyList()
-
     val urls = currentBundle?.imageUrls ?: emptyList()
+    val tasksStatus by viewModel.tasksStatus.collectAsState()
+    val isCurrentBundleFetching = currentTaskId != null &&
+            tasksProgress.containsKey(currentTaskId) &&
+            tasksStatus[currentTaskId] == GenerationStatus.RUNNING
 
     println("DEBUG_PATHS: paths = $paths")
     println("DEBUG_URLS: urls = $urls")
@@ -153,7 +151,8 @@ fun ResultScreen(
             }
         }
 
-        if (isFetchingImages) {
+
+        if (isCurrentBundleFetching) {
             ExploreSection { onBackClick() }
         }
 
