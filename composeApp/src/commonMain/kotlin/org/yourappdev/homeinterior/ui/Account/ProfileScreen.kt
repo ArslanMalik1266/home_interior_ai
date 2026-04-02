@@ -53,6 +53,8 @@ fun ProfileScreen(
     }
     var showLogoutDialog by remember { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var notificationsEnabled by remember { mutableStateOf(true) }
+
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -194,6 +196,8 @@ fun ProfileScreen(
             ProfileMenuItems(
                 email = user?.userEmail ?: "Guest User",
                 isLoggedIn = isLoggedIn,
+                notificationsEnabled = notificationsEnabled,
+                onNotificationToggle = { notificationsEnabled = it },
                 onLogoutClick = { showLogoutDialog = true },
                 onLoginClick = { onLoginClick() }
             )
@@ -256,6 +260,8 @@ fun ProfileHeader( email: String) {
 fun ProfileMenuItems(
     email: String,
     isLoggedIn: Boolean,
+    notificationsEnabled: Boolean,
+    onNotificationToggle: (Boolean) -> Unit,
     onLogoutClick: () -> Unit,
     onLoginClick: () -> Unit
 ) {
@@ -269,6 +275,7 @@ fun ProfileMenuItems(
             label = "Email",
             value = email
         )
+
 
         ProfileMenuItem(
             label = "Restore Purchases",

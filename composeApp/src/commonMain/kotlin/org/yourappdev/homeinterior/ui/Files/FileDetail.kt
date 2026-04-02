@@ -62,6 +62,7 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                       selectedIndex: Int = 0,
                       isTrending: Boolean = false ) {
     val scope = rememberCoroutineScope()
+
     var saveSuccess by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(saveSuccess) {
         if (saveSuccess != null) {
@@ -96,7 +97,8 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-        ) {
+        )
+        {
             TopBar(
                 darkText = darkText,
                 gradientColors = gradientColors
@@ -205,25 +207,27 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
 
                 }
             }
-            saveSuccess?.let { success ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (success) Color(0xFF4CAF50) else Color(0xFFDC3545)
-                        )
-                        .padding(12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (success) "✅ Image saved to gallery!" else "❌ Save failed!",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
+
+        }
+        saveSuccess?.let { success ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (success) Color(0xFF4CAF50) else Color(0xFFDC3545)
                     )
-                }
+                    .padding(12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (success) "✅ Image saved to gallery!" else "❌ Save failed!",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
         if (showDelete) {
@@ -263,7 +267,8 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                     }
                 )
             }
-        }    }
+        }
+    }
 }
 
 @Composable

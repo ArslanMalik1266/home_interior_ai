@@ -20,5 +20,13 @@
         <string>org.yourappdev.homeinterior.imageProcessing</string>
         <string>org.yourappdev.homeinterior.checkStatus</string>
     </array>
+
+    <!-- ✅ YE ADD KARO — Gallery save ke liye zaroori -->
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>App needs access to save generated interior images to your gallery</string>
+
+    <!-- ✅ YE BHI ADD KARO — Agar gallery read bhi karte ho -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>App needs access to your photo library</string>
 </dict>
 </plist>

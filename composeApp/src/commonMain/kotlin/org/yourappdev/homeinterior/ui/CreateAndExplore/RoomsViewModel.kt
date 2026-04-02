@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.yourappdev.homeinterior.data.local.entities.DraftEntity
 import org.yourappdev.homeinterior.data.local.entities.RecentGeneratedEntity
 import org.yourappdev.homeinterior.data.mapper.toUi
@@ -48,6 +50,7 @@ import org.yourappdev.homeinterior.utils.getDeviceId
 import org.yourappdev.homeinterior.utils.readLocalFile
 import org.yourappdev.homeinterior.utils.saveImageBytes
 import org.yourappdev.homeinterior.utils.toBase64
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
@@ -412,15 +415,30 @@ class RoomsViewModel(
                         }
 
                         // Generation request (captured variables ke saath)
-                        val base64Image = "data:image/jpeg;base64,${capturedImageBytes.toBase64()}"
+                        val base64Image = withContext(Dispatchers.Default) {
+                            "data:image/jpeg;base64,${capturedImageBytes.toBase64()}"
+                        }
                         val request = GenerateRoomRequest(initImage = base64Image, prompt = capturedPrompt)
 
                         // 3 Parallel Calls
-                        val results = awaitAll(
-                            async { generateRoomUseCase(request) },
-                            async { generateRoomUseCase(request) },
-                            async { generateRoomUseCase(request) }
-                        )
+                        // Instead of awaitAll (which cancels all if one fails):
+                        val results = listOf(
+                            async {
+                                try { generateRoomUseCase(request) }
+                                catch (e: CancellationException) { throw e } // rethrow coroutine cancellation
+                                catch (e: Exception) { ResultState.Error(e.message ?: "Failed") }
+                            },
+                            async {
+                                try { generateRoomUseCase(request) }
+                                catch (e: CancellationException) { throw e }
+                                catch (e: Exception) { ResultState.Error(e.message ?: "Failed") }
+                            },
+                            async {
+                                try { generateRoomUseCase(request) }
+                                catch (e: CancellationException) { throw e }
+                                catch (e: Exception) { ResultState.Error(e.message ?: "Failed") }
+                            }
+                        ).awaitAll()
                         results.forEachIndexed { index, result ->
                             if (result is ResultState.Success) {
                                 println("DEBUG_ETA: Task $index eta = ${result.data.eta}")
@@ -465,6 +483,7 @@ class RoomsViewModel(
                                 if (response.isProcessing && response.fetchUrl != null) {
                                     startImageTrackingUseCase(newTaskId, (maxEta * 0.8).toLong(), results.filter { it is ResultState.Success }.mapNotNull { (it as ResultState.Success).data.fetchUrl })
                                     launch {
+                                        delay(index * 2000L)
                                         var retries = 0
                                         while (retries < 30) {
                                             val fetchResult = fetchGeneratedRoomUseCase(response.fetchUrl)
@@ -529,9 +548,12 @@ class RoomsViewModel(
                                 }
                             }
                         }
-                    } catch (e: Exception) {
-                        _state.update { it.copy(activeTasksCount = (it.activeTasksCount - 1).coerceAtLeast(0)) }
-                    }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _state.update { it.copy(activeTasksCount = (it.activeTasksCount - 1).coerceAtLeast(0)) }
+                    _uiEvent.emit(ShowError("Generation failed: ${e.message}"))
+                }
                 }
             }
             is RoomEvent.OnCancelGeneration -> {
@@ -716,33 +738,48 @@ class RoomsViewModel(
         val colorPaletteString = cleanHexColors.joinToString(", ")
 
         return """
-Photorealistic architectural photography of a $style $roomType, strictly adhering to the $style design language and spatial characteristics typical of a $roomType.
+Ultra-photorealistic architectural interior photography of a $style $roomType. This is a REDESIGN of an existing room — the camera captures the same space, same walls, same ceiling height, same floor, same window positions, same door positions. Nothing structural has moved or changed. Only surfaces, furniture, and decor have been replaced.
 
-The original architecture must remain completely unchanged: no new windows, no removal of doors, no structural modifications, no added openings, no layout alterations. Preserve all architectural elements exactly as they are (walls, doors, windows, ceiling, proportions, and spatial layout). Only surface-level decoration is allowed.
+ARCHITECTURAL PRESERVATION — ABSOLUTE
+Every wall, ceiling, floor, window, and door remains IDENTICAL to the input image. No new openings, no removed elements, no structural changes whatsoever. Room proportions, depth, and spatial layout are pixel-accurate to the original. The camera angle and perspective must match the original room photograph exactly. Ceiling height, room width, and depth are unchanged.
 
-The interior must use a $colorPaletteString color scheme exclusively, where all primary and secondary elements (walls, furniture, decor, textiles, and lighting tones) are derived from or harmonized with $colorPaletteString. If $colorPaletteString contains only one color, create depth using tonal variations (shades, tints, and gradients) of that single color only. No unrelated colors, substitutions, reflections introducing new hues, or neutral shifts are allowed.
+COLOR PALETTE — STRICT ENFORCEMENT
+Dominant palette: $colorPaletteString. ALL surfaces including walls, floor, and ceiling trim must use $colorPaletteString tones only. ALL furniture including upholstery, frames, and legs must be within $colorPaletteString. ALL decor including cushions, rugs, curtains, and artwork must reflect $colorPaletteString. Tonal variations are allowed — use lighter and darker shades of $colorPaletteString for depth. Any color outside $colorPaletteString family is strictly forbidden, including accidental greys, reflected hues from lighting, and neutral drift. If palette includes black, use true deep black only such as matte black, jet black, or near-black charcoal — the scene must appear dark and rich, NOT grey, NOT desaturated, NOT washed out. If palette is a single color, build depth through tints and shades of that one color only.
 
-If $colorPaletteString = black: enforce true black dominance — deep black tones only (matte black, jet black, charcoal near-black). Do NOT generate grey, blue, brown, or desaturated substitutes. The scene must remain visually dark and black-dominant, not bright or washed out.
+FURNITURE PRIORITY — NON NEGOTIABLE
+Furniture is the most important element of this room. The room must first be completely and properly furnished before any wall decor or accessories are added. A $roomType without its core furniture is unacceptable. Required furniture by room type:
 
-Redecorate walls in alignment with $style, while preserving the original architectural structure and layout of the $roomType. Add minimal, style-appropriate wall elements (such as panels, moldings, or subtle decor), all strictly within $colorPaletteString, avoiding clutter or variation.
+If $roomType is Living Room: a full sofa or sectional, one or two armchairs, a coffee table, a side table, a TV console or media unit, and a floor lamp are all mandatory.
 
-Include high-end furniture consistent with $style, featuring premium materials such as velvet, polished wood, marble, brushed metal, or glass, with highly detailed textures. Furniture must be logically and professionally arranged according to real interior design principles (correct scale, spacing, alignment, and function), with no floating, misaligned, or awkwardly placed objects. Maintain clear focal points and natural flow within the $roomType. All furniture colors must strictly conform to $colorPaletteString.
+If $roomType is Bedroom: a full bed with headboard, two nightstands, a dresser or wardrobe, a bench or ottoman at foot of bed, and bedside lamps are all mandatory.
 
-Lighting should be soft cinematic natural sunlight entering only through existing architectural openings (no new windows), creating gentle shadows and a professional atmosphere, while preserving the integrity and depth of $colorPaletteString without washing out, brightening, or shifting tones.
+If $roomType is Dining Room: a dining table sized for the room, a full set of dining chairs, a sideboard or buffet table, and a pendant light above the table are all mandatory.
 
-Ultra-high-resolution (8K), sharp focus, depth of field, highly detailed materials, physically accurate lighting, global illumination, and realistic reflections.
+If $roomType is Kitchen: counter stools or breakfast bar seating, open shelving styled with dishes and plants, and a kitchen island if space allows are all mandatory.
 
-Composition should resemble professional interior architectural photography, with balanced framing, clear subject hierarchy, and a refined aesthetic.
+If $roomType is Home Office: a large desk, an ergonomic chair, a bookshelf or shelving unit, a desk lamp, and storage units are all mandatory.
 
-Strict priority constraints (must not be violated):
+If $roomType is Bathroom: a styled vanity with mirror, towel rack with folded towels, a small plant, and bath accessories on counter are all mandatory.
 
-Do not modify architecture in any way
-Do not add or remove windows, doors, or structural elements
-Enforce $colorPaletteString with zero color deviation
-Black must appear as true black, not grey or tinted
-No color contamination from lighting or reflections
-No misplaced furniture, no floating objects, no clutter
-No text, no watermark, no typography""".trimIndent()
+All mandatory furniture must appear in the scene. Furniture placement takes absolute priority over wall decor. Wall decor and accessories are secondary and must only fill remaining visual space after furniture is fully placed. The room must look like a real functioning space first — then styled.
+
+FURNITURE — REAL INTERIOR DESIGN STANDARDS
+Furniture must look like it belongs in a real, lived-in $style $roomType. Scale is proportional to the room with no oversized or undersized pieces. Every piece sits firmly on the floor with zero floating objects. Legs of chairs, tables, and sofas must cast proper shadows and contact the floor. Arrangement follows real interior design logic: sofa faces focal point such as fireplace, TV, or window; coffee table is centered and reachable from seating; bed is centered on main wall with equal nightstands; dining chairs are evenly spaced and tucked into table. Materials must be premium and physically accurate — velvet shows micro-texture and sheen variation, wood shows grain and natural variation, marble shows veining and reflective depth, metal shows brushed or polished surface quality, glass shows transparency and edge refraction. No clutter, no random objects, no decorative excess.
+
+WALL DECOR — REQUIRED AFTER FURNITURE IS COMPLETE
+Walls must never be bare or empty. Once furniture is fully placed, every visible wall surface must include at least one or two tasteful, style-appropriate decorative elements chosen from the following based on $style: large framed artwork or canvas paintings, curated gallery walls with 3 to 5 frames in matching or complementary sizes, architectural wall panels or textured feature walls, floating shelves with books, small sculptures, and plants, decorative mirrors with style-appropriate frames, wall sconces or mounted lighting fixtures, subtle wallpaper or textured wall finish, or woven wall hangings and tapestries. All wall decor must strictly use $colorPaletteString tones. Frames, artwork backgrounds, shelf contents, and mirror frames must all harmonize with the palette. Wall decor must be proportional to wall size — not too small and not overwhelming.
+
+ROOM ACCESSORIES — LIVED-IN BUT CURATED
+The room must feel complete, warm, and lived-in with carefully selected accessories that add personality without creating clutter. Include a small selection of the following based on $style and $roomType: a ceramic or sculptural vase with dried or fresh flowers on a side table or console, 2 to 4 decorative throw pillows on sofa or bed in coordinating $colorPaletteString tones, a neatly folded throw blanket draped over sofa or armchair, a styled coffee table or nightstand with 2 to 3 objects such as a tray, candle, small book stack, or decorative object, a potted indoor plant or small tree in a style-appropriate planter, a decorative rug that grounds the seating or sleeping area and stays within $colorPaletteString, table lamp or floor lamp that adds warm layered lighting, and small framed photo or art piece on a shelf or side table. All accessories must strictly conform to $colorPaletteString. No excess, no randomness — every object must feel intentionally placed by a professional interior stylist.
+
+LIGHTING — CINEMATIC AND NATURAL
+Soft, diffused natural light enters ONLY through existing windows in the same positions as the input image. Light creates gentle gradients, soft shadows, and warm depth. No harsh highlights, no overexposed surfaces, no blown-out areas. Lighting enhances $colorPaletteString and must NOT shift, wash out, or contaminate the palette. Global illumination allows ambient bounce light to fill shadows naturally. Table lamps and floor lamps emit soft warm glows that layer with natural light to create depth and intimacy. No artificial studio lighting unless $style specifically requires it.
+
+PHOTOGRAPHY QUALITY
+Resolution is 8K ultra-sharp. Lens is 24-35mm wide angle with slight perspective correction. Depth of field keeps foreground slightly soft and mid-room in sharp focus. No lens distortion, no vignette, no post-processing artifacts. Composition follows rule of thirds with a clear focal point and balanced negative space. Style reference is Architectural Digest, Elle Decor, and Dezeen editorial photography.
+
+ABSOLUTE FORBIDDEN LIST
+No structural changes to walls, ceiling, floor, windows, or doors. No bare or completely empty walls. No missing mandatory furniture for the $roomType. No floating furniture or objects not touching surfaces. No colors outside $colorPaletteString family. No text, watermarks, logos, or typography anywhere. No cartoon, illustration, CGI-render, or painterly look. No duplicate objects or copy-paste repetition. No misaligned or incorrectly scaled furniture. No excessive clutter or more than 6 to 8 accessories total in the scene. No grey substitutes for black palette. No lighting-induced color contamination. No randomly placed objects that serve no design purpose. No wall decor added before furniture is complete.""".trimIndent()
     }
 
     // Helper to clean existing strings
@@ -1020,6 +1057,8 @@ No text, no watermark, no typography""".trimIndent()
             }
         }
     }
+
+
 
 
 }

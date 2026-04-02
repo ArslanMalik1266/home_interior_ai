@@ -59,7 +59,7 @@ fun createHttpClientManual(
                     co.touchlab.kermit.Logger.i { "KTOR_LOG: $message" }
                 }
             }
-            level = LogLevel.ALL
+            level = LogLevel.HEADERS
             sanitizeHeader { header ->
                 header == HttpHeaders.Authorization
             }

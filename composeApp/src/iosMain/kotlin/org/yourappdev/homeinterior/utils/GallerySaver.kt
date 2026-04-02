@@ -1,5 +1,6 @@
 package org.yourappdev.homeinterior.utils
 
+
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
@@ -8,8 +9,10 @@ import platform.Foundation.NSURL
 import platform.Foundation.dataWithBytes
 import platform.Foundation.dataWithContentsOfURL
 import platform.UIKit.UIImage
-import platform.UIKit.UIImageWriteToSavedPhotosAlbum
-import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.resume
+
+import platform.Photos.PHAssetChangeRequest
+import platform.Photos.PHPhotoLibrary
 
 @OptIn(ExperimentalForeignApi::class)
 actual suspend fun saveImageToGallery(
@@ -43,15 +46,26 @@ actual suspend fun saveImageToGallery(
 
         uiImage ?: return false
 
-        UIImageWriteToSavedPhotosAlbum(uiImage, null, null, null)
-
-        // ✅ iOS ko thoda time do save karne ka
-        kotlinx.coroutines.delay(500)
-        true  // ✅ Assume success
+        // ✅ PHPhotoLibrary — proper async with real result
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            PHPhotoLibrary.sharedPhotoLibrary().performChanges(
+                changeBlock = {
+                    PHAssetChangeRequest.creationRequestForAssetFromImage(uiImage)
+                },
+                completionHandler = { success, error ->
+                    if (success) {
+                        println("✅ iOS Save Success")
+                        continuation.resume(true)
+                    } else {
+                        println("❌ iOS Save Error: ${error?.localizedDescription}")
+                        continuation.resume(false)
+                    }
+                }
+            )
+        }
 
     } catch (e: Exception) {
         println("❌ iOS Save failed: ${e.message}")
         false
     }
-
 }

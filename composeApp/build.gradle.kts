@@ -68,6 +68,7 @@ kotlin {
         }
         commonMain.dependencies {
             implementation(libs.kotlinx.serialization.core)
+            implementation(libs.multiplatform.settings)
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
@@ -106,8 +107,6 @@ kotlin {
 
 
 
-            implementation(libs.multiplatform.settings.no.arg)
-            implementation(libs.multiplatform.settings)
 
             implementation(libs.imagepickerkmp)
 

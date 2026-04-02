@@ -1,7 +1,6 @@
 package org.yourappdev.homeinterior.utils
 
 import android.Manifest
-import android.R
 import android.app.ActivityManager
 import android.app.NotificationChannel
 import android.app.NotificationManager as AndroidNotificationManager
@@ -42,8 +41,20 @@ actual object NotificationManager {
         }
     }
 
+    actual fun isNotificationsEnabled(): Boolean {
+        return SettingsManager.isNotificationsEnabled()
+    }
+
+    actual fun setNotificationsEnabled(enabled: Boolean) {
+        SettingsManager.setNotificationsEnabled(enabled)
+    }
+
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     actual fun notifyIfBackground() {
+        if (!isNotificationsEnabled()) {
+            println("🔕 Notifications disabled by user — skipping")
+            return
+        }
         showNotification()
     }
 
@@ -52,14 +63,13 @@ actual object NotificationManager {
             val appProcesses = (AppContext.get()
                 .getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager)
                 .runningAppProcesses ?: return true
-
             val packageName = AppContext.get().packageName
             appProcesses.none {
                 it.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
                         && it.processName == packageName
             }
         } catch (e: Exception) {
-            true // Error aaye to background samjho aur notification do
+            true
         }
     }
 
@@ -67,28 +77,21 @@ actual object NotificationManager {
     private fun showNotification() {
         println("🚀 Step 1: showNotification() called")
         val context = AppContext.get()
-
-        // 1. Check if notifications are enabled for the whole app
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
             println("❌ Error: App notifications are DISABLED in System Settings!")
             return
         }
-
         val intent = context.packageManager
             .getLaunchIntentForPackage(context.packageName)
             ?.apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
-
         val pendingIntent = PendingIntent.getActivity(
             context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        println("📝 Step 2: Building Notification (Channel ID: $CHANNEL_ID)")
-
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // Using standard system icon for testing
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Interior Design Ready")
             .setContentText("Your design is ready. Tap to view.")
             .setStyle(
@@ -99,20 +102,14 @@ actual object NotificationManager {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .setDefaults(NotificationCompat.DEFAULT_ALL) // Ensures sound and vibration
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
-
         try {
-            println("Sending notification to system... ID: $NOTIF_ID")
-
-            // Using direct System Service for better reliability
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             manager.notify(NOTIF_ID, notification)
-
             println("✅ Step 3: Notification successfully sent to the system!")
         } catch (e: Exception) {
             println("⚠️ Error during notify: ${e.message}")
-            e.printStackTrace()
         }
     }
 }

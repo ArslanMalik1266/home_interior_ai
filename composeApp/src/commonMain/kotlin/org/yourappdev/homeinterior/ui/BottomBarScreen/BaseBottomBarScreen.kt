@@ -323,6 +323,8 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                             showGallery = true
                         },
                         onRoomClick = { room ->
+
+
                             navController.navigate(
                                 Routes.FileEdit(
                                     imageUrl = room.imageUrl,
@@ -405,7 +407,6 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                     val selectedBundleId by roomViewModel.selectedBundleId.collectAsState()
 
 
-                    // 1. Pehle ye decide karein ke hum bundle (current generation) dekh rahe hain ya DB se purana data
                     val entity = remember(args, dbImages, state, selectedBundleId) {
                         when {
                             // Agar generate screen se aa rahe hain (Result Screen bundle)
@@ -422,6 +423,15 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                     val selectedIndex = if (args.imageIndex >= 0) args.imageIndex else 0
 
                     when {
+                        args.imageUrl.isNotEmpty() -> {
+                            CreateEditScreen(
+                                entity = null,
+                                viewModel = null,
+                                imageUrlString = args.imageUrl,
+                                isTrending = true,
+                                onClick = { navController.popBackStack() }
+                            )
+                        }
                         entity != null -> {
                             // Bundle ya DB record se sahi image path uthana
                             val imagePath = entity.localPaths.getOrNull(selectedIndex) ?: ""
@@ -452,15 +462,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                             )
                         }
                         // Trending images ke liye logic
-                        args.imageUrl.isNotEmpty() -> {
-                            CreateEditScreen(
-                                entity = null,
-                                viewModel = null,
-                                imageUrlString = args.imageUrl,
-                                isTrending = true,
-                                onClick = { navController.popBackStack() }
-                            )
-                        }
+
 
                         else -> {
                             Box(

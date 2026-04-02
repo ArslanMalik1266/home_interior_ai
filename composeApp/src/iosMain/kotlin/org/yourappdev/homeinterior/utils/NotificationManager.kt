@@ -32,6 +32,14 @@ actual object NotificationManager {
         }
     }
 
+    actual fun isNotificationsEnabled(): Boolean {
+        return SettingsManager.isNotificationsEnabled()
+    }
+
+    actual fun setNotificationsEnabled(enabled: Boolean) {
+        SettingsManager.setNotificationsEnabled(enabled)
+    }
+
     actual fun isAppInBackground(): Boolean {
         val state = UIApplication.sharedApplication.applicationState
         // iOS States: Active (0), Inactive (1), Background (2)

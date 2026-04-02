@@ -39,6 +39,8 @@ import homeinterior.composeapp.generated.resources.settingback
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.yourappdev.homeinterior.ui.authentication.AuthViewModel
+import org.yourappdev.homeinterior.utils.NotificationManager
+import org.yourappdev.homeinterior.utils.SettingsManager
 
 @Composable
 fun AccountScreen(
@@ -48,6 +50,8 @@ fun AccountScreen(
 ) {
 
     val state by viewModel.state.collectAsState()
+    var isEnabled by remember { mutableStateOf(NotificationManager.isNotificationsEnabled()) }
+
     LifecycleResumeEffect(Unit) {
         viewModel.fetchUserDetails()
         onPauseOrDispose { }
@@ -267,7 +271,7 @@ fun CreditCard(
 
 @Composable
 fun NotificationsToggle() {
-    var isEnabled by remember { mutableStateOf(true) }
+    var isEnabled by remember { mutableStateOf<Boolean>(SettingsManager.isNotificationsEnabled()) }
 
     // Colors derived from your XML/Image
     val orange = Color(0xFFA3B18A) // The green from your pic (or use 0xFFFF9800 for orange)
@@ -299,7 +303,10 @@ fun NotificationsToggle() {
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
-                ) { isEnabled = !isEnabled },
+                ) {
+                    isEnabled = !isEnabled
+                    SettingsManager.setNotificationsEnabled(isEnabled)
+                  },
             contentAlignment = Alignment.CenterStart
         ) {
             Box(
