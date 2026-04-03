@@ -24,7 +24,7 @@ sealed class RoomEvent {
     data class OnCancelGeneration(val taskId: String) : RoomEvent()
 
 
-    data class OnPurchasePlan(val price: String) : RoomEvent()
+    data class OnPurchasePlan(val productId: String) : RoomEvent()
     data object ClearPurchaseState : RoomEvent()
     data class OnTempFilterChange(val filterState: FilterState) : RoomEvent()
     data class OnToggleFilterSection(val section: FilterSection) : RoomEvent()

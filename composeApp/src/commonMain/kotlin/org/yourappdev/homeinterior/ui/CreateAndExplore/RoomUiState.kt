@@ -59,13 +59,15 @@ data class RoomUiState(
     val generatedRoom: GenerateRoomResponse? = null,
     val selectedImageBytes: ByteArray? = null,
     val selectedFileName: String? = null,
-    val isPurchasing: Boolean = false,
-    val purchaseSuccess: String? = null,
-    val purchaseError: String? = null,
     val generatedCount: Int = 3,
     val generatedImagesEntity: List<RecentGeneratedEntity> = emptyList(),
     val isFetchingImages: Boolean = false,
     val etaSeconds: Int = 0,
+
+    val isPurchasing: Boolean = false,
+    val purchaseSuccess: String? = null,
+    val purchaseError: String? = null,
+    val billingProducts: List<org.yourappdev.homeinterior.billing.PurchaseProduct> = emptyList(),
 
 
     )

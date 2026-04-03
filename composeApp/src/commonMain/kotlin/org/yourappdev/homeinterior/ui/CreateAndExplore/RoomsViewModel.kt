@@ -76,6 +76,9 @@ class RoomsViewModel(
     private val _state = MutableStateFlow(RoomUiState())
     val state: StateFlow<RoomUiState> = _state.asStateFlow()
     private val _tasksProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+
+    private var billingHelper: org.yourappdev.homeinterior.billing.BillingHelper? = null
+
     val tasksProgress = _tasksProgress.asStateFlow()
     // Har TaskID ka apna status track karne ke liye
     private val _tasksStatus = MutableStateFlow<Map<String, GenerationStatus>>(emptyMap())
@@ -182,6 +185,7 @@ class RoomsViewModel(
     }
 
     init {
+        initBilling()
         getRooms()
         viewModelScope.launch {
             dbGeneratedImages.collect { images ->
@@ -804,61 +808,61 @@ No structural changes to walls, ceiling, floor, windows, or doors. No bare or co
         }
     }
 
-    fun onSubscriptionEvent(event: RoomEvent) {
-        when (event) {
-            is RoomEvent.OnPurchasePlan -> {
-                // Price to Credits Mapping
-                val amount = when (event.price) {
-                    "$9.99" -> 500
-                    "$18.99" -> 1100
-                    "$28.99" -> 2300
-                    else -> 0
-                }
-
+    private fun initBilling() {
+        billingHelper = org.yourappdev.homeinterior.billing.BillingHelper(
+            onProductsLoaded = { products ->
+                _state.update { it.copy(billingProducts = products) }
+            },
+            onPurchaseComplete = { productId, credits ->
                 val email = authViewModel.state.value.email ?: ""
-
-                println("DEBUG_PURCHASE: Event triggered for price: ${event.price}")
-                println("DEBUG_PURCHASE: Mapped amount: $amount")
-                println("DEBUG_PURCHASE: User email: '$email'")
-
-                if (email.isBlank()) {
-                    _state.update { it.copy(purchaseError = "User not logged in") }
-                    return
-                }
-
-                _state.update { it.copy(isPurchasing = true, purchaseError = null) }
-
-                viewModelScope.launch {
-                    val result = addCreditsUseCase(email, amount)
-
-                    result.onSuccess { response ->
-                        _state.update {
-                            it.copy(
-                                isPurchasing = false,
-                                purchaseSuccess = "Credits added: ${response.purchasedCredits}"
-                            )
-                        }
-                        authViewModel.onAuthEvent(RegisterEvent.FetchUserDetails)
-                    }.onFailure { error ->
-                        println("DEBUG_PURCHASE: Failure! Error: ${error.message}")
-                        _state.update {
-                            it.copy(
-                                isPurchasing = false,
-                                purchaseError = error.message ?: "Transaction failed"
-                            )
+                if (email.isNotBlank()) {
+                    viewModelScope.launch {
+                        val result = addCreditsUseCase(email, credits)
+                        result.onSuccess { response ->
+                            _state.update {
+                                it.copy(
+                                    isPurchasing = false,
+                                    purchaseSuccess = "Credits added: ${response.purchasedCredits}"
+                                )
+                            }
+                            authViewModel.onAuthEvent(RegisterEvent.FetchUserDetails)
+                        }.onFailure { error ->
+                            _state.update {
+                                it.copy(
+                                    isPurchasing = false,
+                                    purchaseError = error.message ?: "Transaction failed"
+                                )
+                            }
                         }
                     }
                 }
             }
+        )
+        billingHelper?.startConnection()
+    }
 
+    fun onSubscriptionEvent(event: RoomEvent) {
+        when (event) {
+            is RoomEvent.OnPurchasePlan -> {
+                val email = authViewModel.state.value.email ?: ""
+                if (email.isBlank()) {
+                    _state.update { it.copy(purchaseError = "User not logged in") }
+                    return
+                }
+                _state.update { it.copy(isPurchasing = true, purchaseError = null) }
+                billingHelper?.launchPurchase(event.productId)  // ✅ Play Store sheet
+            }
             RoomEvent.ClearPurchaseState -> {
                 _state.update { it.copy(purchaseSuccess = null, purchaseError = null) }
             }
-
-            else -> onRoomEvent(event) // Purane events ko bhej dein
+            else -> onRoomEvent(event)
         }
     }
-    // RoomsViewModel.kt
+
+    override fun onCleared() {
+        super.onCleared()
+        billingHelper?.disconnect()
+    }    // RoomsViewModel.kt
     fun deleteRecentImage(id: Long, onDeleted: () -> Unit) {
         viewModelScope.launch {
             println("DEBUG_VM: Attempting to delete image with ID: $id")

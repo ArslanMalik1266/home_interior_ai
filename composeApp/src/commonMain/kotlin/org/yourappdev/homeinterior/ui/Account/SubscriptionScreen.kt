@@ -64,6 +64,7 @@
     fun SubscriptionScreen(onBackClick: () -> Unit,
                            roomsViewModel: RoomsViewModel
     ) {
+
         SetStatusBarIcons(isLight = true)
 
         DisposableEffect(Unit) {
@@ -72,13 +73,14 @@
             }
         }
 
+        val state by roomsViewModel.state.collectAsState()
 
 
         val subscriptionPlans = listOf(
             SubscriptionPlan(
                 name = "Standard",
-                price = "$9.99",
-                credits = "500 credits",
+                price = state.billingProducts.find { it.productId == "credits_basic" }?.price ?: "",
+                credits = "200 credits",
                 features = listOf(
                     "Full crack generation with advanced AI enhancement.",
                     "Professional made for expert-level design precision.",
@@ -89,8 +91,8 @@
             ),
             SubscriptionPlan(
                 name = "Pro",
-                price = "$18.99",
-                credits = "1100 credits",
+                price = state.billingProducts.find { it.productId == "credits_standard" }?.price ?: "",
+                credits = "500 credits",
                 features = listOf(
                     "Unlimited parallel generation with advanced AI.",
                     "Professional mode for expert-level design precision.",
@@ -101,8 +103,8 @@
             ),
             SubscriptionPlan(
                 name = "Premium",
-                price = "$28.99",
-                credits = "2300 credits",
+                price = state.billingProducts.find { it.productId == "credits_pro" }?.price ?: "",
+                credits = "900 credits",
                 features = listOf(
                     "Priority access to all new AI features and tools.",
                     "Custom model generation for tailored results.",
@@ -113,7 +115,6 @@
             )
         )
 
-        val state by roomsViewModel.state.collectAsState()
         val pagerState = rememberPagerState(pageCount = { subscriptionPlans.size })
         val pagerOffset = pagerState.currentPageOffsetFraction
 
@@ -273,8 +274,13 @@
 
                 Button(
                     onClick = {
-                        val currentPlan = subscriptionPlans[pagerState.currentPage]
-                        roomsViewModel.onSubscriptionEvent(RoomEvent.OnPurchasePlan(currentPlan.price))
+                        val productId = when (pagerState.currentPage) {
+                            0 -> "credits_standard"
+                            1 -> "credits_pro"
+                            2 -> "credits_pro"
+                            else -> ""
+                        }
+                        roomsViewModel.onSubscriptionEvent(RoomEvent.OnPurchasePlan(productId))
                     },
                     modifier = Modifier
                         .fillMaxWidth()

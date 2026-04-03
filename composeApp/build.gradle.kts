@@ -61,6 +61,8 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation("androidx.work:work-runtime-ktx:2.9.0")
             implementation("io.insert-koin:koin-androidx-workmanager:3.5.0")
+            implementation(libs.billing)
+            implementation(libs.billing.ktx)
 
         }
         iosMain.dependencies {

@@ -121,7 +121,7 @@ fun Header(onClick: () -> Unit) {
         verticalAlignment = Alignment.Top
     ) {
         Text(
-            text = "Interior AI",
+            text = "Interiorism AI",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF2C2C2C),

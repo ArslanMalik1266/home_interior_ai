@@ -45,6 +45,7 @@ import org.yourappdev.homeinterior.ui.authentication.AuthViewModel
 import org.yourappdev.homeinterior.utils.NotificationManager
 import org.yourappdev.homeinterior.utils.SettingsManager
 import org.yourappdev.homeinterior.utils.openEmail
+import org.yourappdev.homeinterior.utils.openUrl
 
 @Composable
 fun AccountScreen(
@@ -310,7 +311,7 @@ fun NotificationsToggle() {
                 ) {
                     isEnabled = !isEnabled
                     SettingsManager.setNotificationsEnabled(isEnabled)
-                  },
+                },
             contentAlignment = Alignment.CenterStart
         ) {
             Box(
@@ -511,7 +512,7 @@ fun AppInfoSection() {
                     text = "Contact Support",
                     showArrow = true,
                     onClick = {
-                       openEmail(
+                        openEmail(
                             to = "hello@webscare.com",
                             subject = "Support Request",
                             body = ""
@@ -520,7 +521,11 @@ fun AppInfoSection() {
                 )
                 AppInfoItem("Help Centre", showArrow = false)
                 AppInfoItem("Terms of Use", showArrow = false)
-                AppInfoItem("Privacy Policy", showArrow = false)
+                AppInfoItem(
+                    "Privacy Policy", showArrow = true,
+                    onClick = {
+                        openUrl("http://webscare.com/privacy-policy-speedometer/")
+                    })
                 AppInfoItem("Rate the App", showArrow = false)
                 AppInfoItem("Help us Improve", showDivider = false, showArrow = false)
             }

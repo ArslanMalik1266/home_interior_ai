@@ -47,7 +47,7 @@ fun SplashScreen(navigationViewModel: NavigationViewModel = koinViewModel(), nav
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Home AI",
+            text = "Interiorism AI",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             color = Color.Black
