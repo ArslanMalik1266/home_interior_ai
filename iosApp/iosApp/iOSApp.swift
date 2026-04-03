@@ -11,7 +11,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
 
         BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: "org.yourappdev.homeinterior.imageProcessing",
+            forTaskWithIdentifier: "com.webscare.interiorismai.imageProcessing",
             using: nil
         ) { task in
             self.handleImageProcessingTask(task: task as! BGProcessingTask)

@@ -1,5 +1,4 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -124,11 +123,11 @@ kotlin {
 }
 
 android {
-    namespace = "org.yourappdev.homeinterior"
+    namespace = "com.webscare.interiorismai"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "org.yourappdev.homeinterior"
+        applicationId = "com.webscare.interiorismai"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
@@ -175,10 +174,10 @@ project.configurations.configureEach {
 
 compose.desktop {
     application {
-        mainClass = "org.yourappdev.homeinterior.MainKt"
+        mainClass = "com.webscare.interiorismai.MainKt"
 
         nativeDistributions { targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "org.yourappdev.homeinterior"
+            packageName = "com.webscare.interiorismai"
             packageVersion = "1.0.0"
         }
     }

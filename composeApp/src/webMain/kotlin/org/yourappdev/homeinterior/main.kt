@@ -1,8 +1,8 @@
-package org.yourappdev.homeinterior
+package com.webscare.interiorismai
 
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
-import org.yourappdev.homeinterior.ui.App
+import com.webscare.interiorismai.ui.App
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {

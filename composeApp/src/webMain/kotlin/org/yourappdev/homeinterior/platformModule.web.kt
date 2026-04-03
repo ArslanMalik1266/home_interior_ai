@@ -1,4 +1,4 @@
-package org.yourappdev.homeinterior
+package com.webscare.interiorismai
 
 import org.koin.core.module.Module
 

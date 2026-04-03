@@ -1,4 +1,4 @@
-package org.yourappdev.homeinterior
+package com.webscare.interiorismai
 
 class WasmPlatform : Platform {
     override val name: String = "Web with Kotlin/Wasm"

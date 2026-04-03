@@ -19,8 +19,8 @@
     </array>
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
-        <string>org.yourappdev.homeinterior.imageProcessing</string>
-        <string>org.yourappdev.homeinterior.checkStatus</string>
+        <string>com.webscare.interiorismai.imageProcessing</string>
+        <string>com.webscare.interiorismai.checkStatus</string>
     </array>
 
     <!-- ✅ YE ADD KARO — Gallery save ke liye zaroori -->
