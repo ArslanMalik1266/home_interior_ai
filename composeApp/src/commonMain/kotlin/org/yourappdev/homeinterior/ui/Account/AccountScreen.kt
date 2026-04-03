@@ -12,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
+
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -41,6 +44,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.yourappdev.homeinterior.ui.authentication.AuthViewModel
 import org.yourappdev.homeinterior.utils.NotificationManager
 import org.yourappdev.homeinterior.utils.SettingsManager
+import org.yourappdev.homeinterior.utils.openEmail
 
 @Composable
 fun AccountScreen(
@@ -503,30 +507,60 @@ fun AppInfoSection() {
             Column(
 
             ) {
-                AppInfoItem("Contact Support")
-                AppInfoItem("Help Centre")
-                AppInfoItem("Terms of Use")
-                AppInfoItem("Privacy Policy")
-                AppInfoItem("Rate the App")
-                AppInfoItem("Help us Improve", showDivider = false)
+                AppInfoItem(
+                    text = "Contact Support",
+                    showArrow = true,
+                    onClick = {
+                       openEmail(
+                            to = "hello@webscare.com",
+                            subject = "Support Request",
+                            body = ""
+                        )
+                    }
+                )
+                AppInfoItem("Help Centre", showArrow = false)
+                AppInfoItem("Terms of Use", showArrow = false)
+                AppInfoItem("Privacy Policy", showArrow = false)
+                AppInfoItem("Rate the App", showArrow = false)
+                AppInfoItem("Help us Improve", showDivider = false, showArrow = false)
             }
         }
     }
 }
 
 @Composable
-fun AppInfoItem(text: String, showDivider: Boolean = true) {
-    Column {
-        Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable {
+fun AppInfoItem(
+    text: String,
+    showDivider: Boolean = true,
+    onClick: () -> Unit = {},
+    showArrow: Boolean = true,
+) {
 
-        }) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onClick() }
+                .padding(vertical = 15.dp, horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
             Text(
                 text = text,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF4D4D4D),
-                modifier = Modifier.padding(vertical = 15.dp, horizontal = 10.dp)
+                color = Color(0xFF4D4D4D)
             )
+
+            if (showArrow) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = Color(0xFFB1B0B0),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
 
         if (showDivider) {

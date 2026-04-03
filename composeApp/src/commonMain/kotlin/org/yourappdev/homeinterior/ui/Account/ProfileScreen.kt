@@ -126,7 +126,7 @@ fun ProfileScreen(
                             "Cancel",
                             color = Color(0xFF808080),
                             fontWeight = FontWeight.Medium,
-                            fontSize = 15.sp
+                            fontSize = 16.sp
                         )
                     }
                 }
@@ -134,9 +134,9 @@ fun ProfileScreen(
             title = {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "Sign Out",
+                        text = "Leaving so soon?",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 20.sp,
+                        fontSize = 18.sp,
                         color = Color(0xFF2C2C2C)
                     )
                 }
@@ -144,9 +144,9 @@ fun ProfileScreen(
             text = {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "Are you sure you want to sign out from your account?",
+                        text = "You'll be signed out of your account.",
                         textAlign = TextAlign.Center,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFF615E5E)
                     )
@@ -210,7 +210,8 @@ fun ProfileScreen(
                 containerColor = Color.Transparent,
                 dragHandle = null, modifier = Modifier.statusBarsPadding()
             ) {
-                DeleteConfirmationDialog(title = "Are you sure you want to delete account?") {
+                DeleteConfirmationDialog(   title = "Leaving so soon?",
+                    subtitle = "You'll be signed out of your account.") {
                     scope.launch {
                         bottomSheetState.hide()
                         showDelete = false

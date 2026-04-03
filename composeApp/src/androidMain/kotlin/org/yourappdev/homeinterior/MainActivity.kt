@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         window.statusBarColor = android.graphics.Color.TRANSPARENT
 
+
         setContent {
             App({
                 androidContext(this@MainActivity.applicationContext)

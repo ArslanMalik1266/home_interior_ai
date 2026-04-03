@@ -44,7 +44,8 @@ import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun DeleteConfirmationDialog(
-    title:String,
+    title: String,
+    subtitle: String = "",  // ✅ yeh add karo
     onConfirm: () -> Unit = {},
     onCancel: () -> Unit = {}
 ) {
@@ -59,7 +60,7 @@ fun DeleteConfirmationDialog(
         ) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Delete",
+                    text = title,  // ✅ "Delete" ki jagah title use karo
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 18.sp,
                     modifier = Modifier.weight(1f).padding(start = 20.dp),
@@ -81,13 +82,19 @@ fun DeleteConfirmationDialog(
                     .fillMaxWidth()
                     .padding(top = 16.dp, bottom = 16.dp)
             )
-            Text(
-                text = title,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Start
-            )
+
+            // ✅ subtitle show karo agar empty nahi hai
+            if (subtitle.isNotEmpty()) {
+                Text(
+                    text = subtitle,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 13.sp,
+                    color = Color(0xFF8C8989),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -111,10 +118,7 @@ fun DeleteConfirmationDialog(
                     )
                 }
                 Button(
-                    onClick = {
-                        println("🔴 DELETE BUTTON CLICKED!")
-                        onConfirm()
-                    },
+                    onClick = { onConfirm() },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xffDC3545)),
                     shape = RoundedCornerShape(50),
                     modifier = Modifier.weight(1f)
