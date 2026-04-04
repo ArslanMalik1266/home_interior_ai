@@ -12,6 +12,10 @@ sealed class RoomEvent {
     object OnResetLoading : RoomEvent()
     object OnClearFilters : RoomEvent()
     data object ClearNavigateToLogin : RoomEvent()
+    data class GoToPage(val page: Int) : RoomEvent()
+    data class SetEditMode(val isEdit: Boolean) : RoomEvent()
+
+
 
     data class SetImageBytes(val bytes: ByteArray, val fileName: String) : RoomEvent()
 

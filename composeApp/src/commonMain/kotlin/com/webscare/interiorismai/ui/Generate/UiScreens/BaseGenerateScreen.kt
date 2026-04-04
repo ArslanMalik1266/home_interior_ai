@@ -68,7 +68,9 @@ fun BaseGenerateScreen(roomsViewModel: RoomsViewModel, endToNext: () -> Unit, on
                         .fillMaxWidth(0.6f)
                 ) {
                     scope.launch {
-                        if (state.currentPage < state.pageCount - 1) {
+                        if (state.isEditMode) {
+                            endToNext()
+                        } else if (state.currentPage < state.pageCount - 1) {
                             roomsViewModel.onRoomEvent(RoomEvent.OnNextPage)
                         } else {
                             endToNext()

@@ -1,11 +1,18 @@
 package com.webscare.interiorismai.ui.Files
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -22,6 +29,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -50,15 +58,26 @@ import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalTime::class)
 @Composable
-fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
-                      imageUrlString: String = "",
-                      onClick: () -> Unit,
-                      onRedo: () -> Unit = {},
-                      viewModel: RoomsViewModel? = null,
-                      entity: RecentGeneratedEntity? = null,
-                      selectedIndex: Int = 0,
-                      isTrending: Boolean = false ) {
+fun CreateEditScreen(
+    imageUrl: ByteArray = byteArrayOf(),
+    imageUrlString: String = "",
+    onClick: () -> Unit,
+    onRedo: () -> Unit = {},
+    viewModel: RoomsViewModel? = null,
+    entity: RecentGeneratedEntity? = null,
+    selectedIndex: Int = 0,
+    isTrending: Boolean = false
+) {
     val scope = rememberCoroutineScope()
+
+    val pagerState = rememberPagerState(
+        initialPage = selectedIndex,
+        pageCount = { entity?.localPaths?.size ?: 1 }
+    )
+    val currentPage = pagerState.currentPage
+
+    val currentImageUrlString = entity?.localPaths?.getOrNull(currentPage) ?: imageUrlString
+
 
     var saveSuccess by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(saveSuccess) {
@@ -109,6 +128,10 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                 imageUrl = imageUrl,
                 imageUrlString = imageUrlString,
                 isTrending = isTrending,
+                originalImagePath = entity?.originalImagePath ?: "",
+                entity = entity,
+                initialIndex = selectedIndex,
+                pagerState = pagerState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
@@ -129,77 +152,77 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                        ActionButton(
-                            icon = Res.drawable.redo,
-                            label = "Redo",
-                            backgroundColor = buttonBackground,
-                            textColor = darkText,
-                            iconTint = grayText,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            if (viewModel != null && entity != null) {
-                                scope.launch {
-                                    viewModel.redoGeneration(
-                                        entity = entity,
-                                        indexToReplace = selectedIndex,
-                                        onResult = { onRedo() })
-                                }
-                            }
-                        }
-
-                        ActionButton(
-                            icon = Res.drawable.save,
-                            label = "Save",
-                            backgroundColor = buttonBackground,
-                            textColor = darkText,
-                            iconTint = grayText,
-                            modifier = Modifier.weight(1f)
-                        ) {
+                    ActionButton(
+                        icon = Res.drawable.redo,
+                        label = "Redo",
+                        backgroundColor = buttonBackground,
+                        textColor = darkText,
+                        iconTint = grayText,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (viewModel != null && entity != null) {
                             scope.launch {
-                                val success = saveImageToGallery(
-                                    imageBytes = if (imageUrl.isNotEmpty()) imageUrl else null,
-                                    imageUrl = if (imageUrlString.isNotEmpty()) imageUrlString else null,
-                                    fileName = "interior_${
-                                        Clock.System.now().toEpochMilliseconds()
-                                    }.jpg"
-                                )
-                                saveSuccess = success
-                                println(if (success) "✅ Saved!" else "❌ Save failed")
+                                viewModel.redoGeneration(
+                                    entity = entity,
+                                    indexToReplace = currentPage,
+                                    onResult = { onRedo() })
                             }
+                        }
+                    }
 
+                    ActionButton(
+                        icon = Res.drawable.save,
+                        label = "Save",
+                        backgroundColor = buttonBackground,
+                        textColor = darkText,
+                        iconTint = grayText,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        scope.launch {
+                            val success = saveImageToGallery(
+                                imageBytes = if (imageUrl.isNotEmpty()) imageUrl else null,
+                                imageUrl = if (currentImageUrlString.isNotEmpty()) currentImageUrlString else null,
+                                fileName = "interior_${
+                                    Clock.System.now().toEpochMilliseconds()
+                                }.jpg"
+                            )
+                            saveSuccess = success
+                            println(if (success) "✅ Saved!" else "❌ Save failed")
                         }
 
+                    }
 
-                        ActionButton(
-                            icon = Res.drawable.deletenew,
-                            label = "Delete",
-                            backgroundColor = buttonBackground,
-                            textColor = darkText,
-                            iconTint = grayText,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            showDelete = true
+
+                    ActionButton(
+                        icon = Res.drawable.deletenew,
+                        label = "Delete",
+                        backgroundColor = buttonBackground,
+                        textColor = darkText,
+                        iconTint = grayText,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        showDelete = true
+                    }
+
+                    ActionButton(
+                        icon = Res.drawable.share,
+                        label = "Share",
+                        backgroundColor = Color.White,
+                        textColor = darkText,
+                        iconTint = grayText,
+                        hasBorder = true,
+                        borderColor = borderColor,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        scope.launch {
+                            shareImage(
+                                imageBytes = if (imageUrl.isNotEmpty()) imageUrl else null,
+                                imageUrl = if (currentImageUrlString.isNotEmpty()) currentImageUrlString else null,
+                                fileName = "interior_design.jpg"
+                            )
                         }
 
-                        ActionButton(
-                            icon = Res.drawable.share,
-                            label = "Share",
-                            backgroundColor = Color.White,
-                            textColor = darkText,
-                            iconTint = grayText,
-                            hasBorder = true,
-                            borderColor = borderColor,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            scope.launch {
-                                shareImage(
-                                    imageBytes = if (imageUrl.isNotEmpty()) imageUrl else null,
-                                    imageUrl = if (imageUrlString.isNotEmpty()) imageUrlString else null,
-                                    fileName = "interior_design.jpg"
-                                )
-                            }
-
-                        }
+                    }
 
 
                 }
@@ -247,7 +270,7 @@ fun CreateEditScreen( imageUrl: ByteArray = byteArrayOf(),
                                 if (viewModel != null && entity != null) {
                                     viewModel.deleteImageFromBundle(
                                         entity = entity,
-                                        imageIndex = selectedIndex,
+                                        imageIndex = currentPage,
                                         onDeleted = { onClick() }
                                     )
                                 } else {
@@ -292,7 +315,7 @@ fun TopBar(
             Spacer(modifier = Modifier.width(8.dp))
 
             Text(
-                text = "Create",
+                text = "Preview",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = darkText
@@ -332,16 +355,63 @@ fun ImageSection(
     imageUrlString: String = "",
     modifier: Modifier = Modifier,
     imageBorder: Color,
-    isTrending: Boolean = false
+    isTrending: Boolean = false,
+    originalImagePath: String = "",
+    entity: RecentGeneratedEntity? = null,
+    initialIndex: Int = 0,
+    pagerState: androidx.compose.foundation.pager.PagerState
 ) {
     LaunchedEffect(Unit) {
         println("🟢 ImageSection - imageUrl bytes: ${imageUrl.size}")
         println("🟢 ImageSection - imageUrlString: '$imageUrlString'")
-        println("🟢 ImageSection - model: ${if (imageUrl.isNotEmpty()) "ByteArray" else getImageModel(imageUrlString) ?: imageUrlString}")
+        println(
+            "🟢 ImageSection - model: ${
+                if (imageUrl.isNotEmpty()) "ByteArray" else getImageModel(
+                    imageUrlString
+                ) ?: imageUrlString
+            }"
+        )
 
     }
     var image by remember { mutableStateOf(Res.drawable.sofa_3) }
     var isPressed by remember { mutableStateOf(false) }
+    var scale by remember { mutableStateOf(1f) }
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+
+
+    val animatedScale by animateFloatAsState(
+        targetValue = scale,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium)
+    )
+    val animatedOffsetX by animateFloatAsState(
+        targetValue = offsetX,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium)
+    )
+    val animatedOffsetY by animateFloatAsState(
+        targetValue = offsetY,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium)
+    )
+
+    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+        scale = (scale * zoomChange).coerceIn(0.7f, 5f)
+        if (scale > 1f) {
+            val maxX = (scale - 1f) * 500f
+            val maxY = (scale - 1f) * 800f
+            offsetX = (offsetX + panChange.x * scale).coerceIn(-maxX, maxX)
+            offsetY = (offsetY + panChange.y * scale).coerceIn(-maxY, maxY)
+        }
+    }
+    LaunchedEffect(transformState.isTransformInProgress) {
+        if (!transformState.isTransformInProgress && scale < 1f) {
+            scale = 1f
+            offsetX = 0f
+            offsetY = 0f
+        }
+    }
+
+
+
     Box(
         modifier = modifier
             .then(if (!isTrending) Modifier.aspectRatio(392f / 620f) else Modifier)
@@ -349,14 +419,44 @@ fun ImageSection(
             .border(1.dp, imageBorder, RoundedCornerShape(9.dp))
             .background(Color(0xFFF5F5F5))
     ) {
-        AsyncImage(
-            model = if (imageUrl.isNotEmpty()) imageUrl
-            else if (imageUrlString.isNotEmpty()) getImageModel(imageUrlString) ?: imageUrlString
-            else null,
-            contentDescription = "Editing Image",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
-        )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxSize()
+                .transformable(
+                    state = transformState,
+                    lockRotationOnZoomPan = true
+                )
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            scale = 1f
+                            offsetX = 0f
+                            offsetY = 0f
+                        }
+                    )
+                },
+            userScrollEnabled = scale == 1f
+        ) { page ->
+            val currentImage = entity?.localPaths?.getOrNull(page) ?: imageUrlString
+
+            AsyncImage(
+                model = if (isPressed && originalImagePath.isNotEmpty()) {
+                    getImageModel(originalImagePath) ?: originalImagePath
+                } else if (imageUrl.isNotEmpty()) imageUrl
+                else getImageModel(currentImage) ?: currentImage,
+                contentDescription = "Editing Image",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = animatedScale,
+                        scaleY = animatedScale,
+                        translationX = animatedOffsetX,
+                        translationY = animatedOffsetY
+                    )
+            )
+        }
 
         Box(
             modifier = Modifier

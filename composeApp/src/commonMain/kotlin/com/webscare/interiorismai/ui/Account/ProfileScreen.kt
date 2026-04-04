@@ -60,8 +60,11 @@ fun ProfileScreen(
     LaunchedEffect(Unit) {
         authViewModel.uiEvent.collect { event ->
             when (event) {
-                is CommonUiEvent.NavigateToSuccess -> {
+                is CommonUiEvent.NavigateAfterLogout -> {
                     onLogoutSuccess()
+                }
+                is CommonUiEvent.NavigateToSuccess -> {
+                    // Yahan kuch mat karo — ye Login/OTP flow ke liye hai
                 }
                 is CommonUiEvent.ShowError -> {
                     println("DEBUG_UI: Logout Error = ${event.message}")

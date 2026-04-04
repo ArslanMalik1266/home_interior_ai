@@ -79,7 +79,6 @@ class AuthViewModel(private val verifyOtpUseCase: VerifyOtpUseCase,
 
                     val session = result.data
                     if (!session.isNew && session.user.userEmail != null) {
-                        settings.putString("user_email", session.user.userEmail!!)
                         _state.update {
                             it.copy(
                                 email = session.user.userEmail!!,
@@ -326,17 +325,21 @@ class AuthViewModel(private val verifyOtpUseCase: VerifyOtpUseCase,
 
                 result.onSuccess { domainModel ->
                     println("DEBUG_LOGOUT: 5. API Success! Status: ${domainModel.status}")
-
                     settings.putBoolean(Constants.LOGIN, false)
                     settings.remove("user_email")
                     println("DEBUG_LOGOUT: 6. Settings Cleared")
-                    _state.value = RegisterState()
+
+                    // ✅ Guest credits preserve karo
+                    val guestFreeCredits = _guestSession.value?.freeCredits ?: 0
+                    val guestTotalCredits = _guestSession.value?.totalCredits ?: 0
+
+                    _state.value = RegisterState().copy(
+                        freeCredits = guestFreeCredits,    // ✅ guest credits rakho
+                        totalCredits = guestTotalCredits   // ✅ guest total rakho
+                    )
                     _user.value = null
-
-
-                    _uiEvent.emit(CommonUiEvent.NavigateToSuccess)
-                    println("DEBUG_LOGOUT: 7. Navigate Event Emitted")
-                }.onFailure { error ->
+                    _uiEvent.emit(CommonUiEvent.NavigateAfterLogout)
+                }                    .onFailure { error ->
                     println("DEBUG_LOGOUT: 5. API Failure: ${error.message}")
                     error.printStackTrace() // Isse poora error stack trace dikhega
                     _uiEvent.emit(CommonUiEvent.ShowError(error.message ?: "Logout Failed"))

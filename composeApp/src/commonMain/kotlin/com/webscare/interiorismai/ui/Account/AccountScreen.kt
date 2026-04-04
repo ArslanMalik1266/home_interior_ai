@@ -37,9 +37,13 @@ import homeinterior.composeapp.generated.resources.keyboard_arrow_up_24px
 import homeinterior.composeapp.generated.resources.settingback
 import org.jetbrains.compose.resources.painterResource
 import com.webscare.interiorismai.ui.authentication.AuthViewModel
+import com.webscare.interiorismai.ui.theme.grey_color
 import com.webscare.interiorismai.utils.NotificationManager
 import com.webscare.interiorismai.utils.SettingsManager
+import com.webscare.interiorismai.utils.getAppVersion
+import com.webscare.interiorismai.utils.getDeviceInfo
 import com.webscare.interiorismai.utils.openEmail
+import com.webscare.interiorismai.utils.openPlayStore
 import com.webscare.interiorismai.utils.openUrl
 
 @Composable
@@ -101,7 +105,6 @@ fun AccountScreen(
         ) {
             onSubscriptionClick()
         }
-        // Scrollable Content
 
         Spacer(modifier = Modifier.height(10.dp))
         Column(
@@ -119,7 +122,29 @@ fun AccountScreen(
 
             AppInfoSection()
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(40.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                Text(
+                    text = getAppVersion(),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = grey_color,
+                    lineHeight = 16.sp
+                )
+                Text(
+                    text = "© 2026 WebsCare Pvt. Ltd. All rights reserved.",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = grey_color,
+                    lineHeight = 16.sp
+                )
+            }
+
         }
 
     }
@@ -234,17 +259,11 @@ fun CreditCard(
                 }
 
             }
-            Box(modifier = Modifier.fillMaxHeight(0.9f), contentAlignment = Alignment.TopCenter) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        modifier = Modifier.size(8.dp),
-                        painter = painterResource(Res.drawable.ic_restore),
-                        contentDescription = null,
-                        tint = Color.Unspecified
-                    )
+//            Box(modifier = Modifier.fillMaxHeight(0.9f), contentAlignment = Alignment.TopCenter) {
+//                Row(
+//                    verticalAlignment = Alignment.CenterVertically,
+//                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+//                ) {
 //                    Icon(
 //                        modifier = Modifier.size(8.dp),
 //                        painter = painterResource(Res.drawable.ic_restore),
@@ -257,14 +276,20 @@ fun CreditCard(
 //                        contentDescription = null,
 //                        tint = Color.Unspecified
 //                    )
-                    Text(
-                        text = "Restore purchases",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF466D00)
-                    )
-                }
-            }
+//                    Icon(
+//                        modifier = Modifier.size(8.dp),
+//                        painter = painterResource(Res.drawable.ic_restore),
+//                        contentDescription = null,
+//                        tint = Color.Unspecified
+//                    )
+//                    Text(
+//                        text = "Restore purchases",
+//                        fontSize = 9.sp,
+//                        fontWeight = FontWeight.Medium,
+//                        color = Color(0xFF466D00)
+//                    )
+//                }
+//            }
         }
     }
 }
@@ -514,15 +539,45 @@ fun AppInfoSection() {
                         )
                     }
                 )
-                AppInfoItem("Help Centre", showArrow = false)
-                AppInfoItem("Terms of Use", showArrow = false)
+                AppInfoItem("Help us Improve", showArrow = true,
+                    onClick = {
+                        openEmail(
+                            to = "hello@webscare.com",
+                            subject = "Feedback – Help Us Improve",
+                            body = ""
+                        )
+                    })
+
+                AppInfoItem("Request a feature", showArrow = true,
+                    onClick = {
+                        openEmail(
+                            to = "hello@webscare.com",
+                            subject = "Feature Request",
+                            body = "Hi, I'd like to request the following feature:\n\n"
+                        )
+                    }
+                )
                 AppInfoItem(
                     "Privacy Policy", showArrow = true,
                     onClick = {
-                        openUrl("http://webscare.com/privacy-policy-speedometer/")
+                        openUrl("http://webscare.com/privacy-policy-interiorism-ai/")
                     })
-                AppInfoItem("Rate the App", showArrow = false)
-                AppInfoItem("Help us Improve", showDivider = false, showArrow = false)
+                AppInfoItem("Rate the App", showArrow = true,
+                    onClick = {
+                        openPlayStore("com.webscare.interiorismai")
+                    }
+                    )
+                AppInfoItem("Report a bug", showDivider = false, showArrow = true,
+                    onClick = {
+                        openEmail(
+                            to = "support@urducanvas.com",
+                            subject = "Bug Report",
+                            body = "Hi, I'd like to report the following bug:\n\n${getDeviceInfo()}\n\nDescription:\n"
+                        )
+                    }
+                    )
+
+
             }
         }
     }

@@ -67,7 +67,8 @@ fun CreateScreen(
     onAddPhotoClick: () -> Unit = {},
     onRoomClick: (RoomUi) -> Unit = {},
     onShowResults: (bundleId: String) -> Unit,
-    onSeeAllClick: () -> Unit
+    onSeeAllClick: () -> Unit,
+    onNavigateToAboutToGenerate: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     val dbImages by viewModel.dbGeneratedImages.collectAsState()

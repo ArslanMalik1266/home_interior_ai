@@ -14,6 +14,9 @@ package com.webscare.interiorismai.ui.Account
     import androidx.compose.runtime.LaunchedEffect
     import androidx.compose.runtime.collectAsState
     import androidx.compose.runtime.getValue
+    import androidx.compose.runtime.mutableStateOf
+    import androidx.compose.runtime.remember
+    import androidx.compose.runtime.setValue
     import androidx.compose.ui.Alignment
     import androidx.compose.ui.Modifier
     import androidx.compose.ui.draw.clip
@@ -41,6 +44,7 @@ package com.webscare.interiorismai.ui.Account
     import com.webscare.interiorismai.ui.UiUtils.ProgressIndicator
     import com.webscare.interiorismai.utils.SetStatusBarIcons
     import com.webscare.interiorismai.utils.toggleStatusBarIcons
+    import homeinterior.composeapp.generated.resources.ic_subscribed_bg
     import kotlin.math.absoluteValue
 
     data class SubscriptionPlan(
@@ -51,10 +55,12 @@ package com.webscare.interiorismai.ui.Account
         val cardColor: Color
     )
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun SubscriptionScreen(onBackClick: () -> Unit,
                            roomsViewModel: RoomsViewModel,
-                           onLoginClick: () -> Unit = {}
+                           onLoginClick: () -> Unit = {},
+                           onAddPhotoClick: () -> Unit = {}
     ) {
 
         SetStatusBarIcons(isLight = true)
@@ -109,11 +115,13 @@ package com.webscare.interiorismai.ui.Account
 
         val pagerState = rememberPagerState(pageCount = { subscriptionPlans.size })
         val pagerOffset = pagerState.currentPageOffsetFraction
+        var showSuccessSheet by remember { mutableStateOf(false) }
+
 
         LaunchedEffect(state.purchaseSuccess) {
             state.purchaseSuccess?.let {
                 roomsViewModel.onSubscriptionEvent(RoomEvent.ClearPurchaseState)
-                onBackClick()
+                showSuccessSheet = true
             }
         }
         LaunchedEffect(state.navigateToLogin) {
@@ -332,7 +340,91 @@ package com.webscare.interiorismai.ui.Account
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
-    }
+        if (showSuccessSheet) {
+            ModalBottomSheet(
+                onDismissRequest = {
+                    showSuccessSheet = false
+                    onBackClick()
+                },
+                containerColor = Color.Transparent,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                dragHandle = null,
+                contentWindowInsets = { WindowInsets(0) }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .background(Color.White)
+
+
+                ) {
+                    // BACKGROUND IMAGE - poore box ke peeche
+                    Image(
+                        painter = painterResource(Res.drawable.ic_subscribed_bg),
+                        contentDescription = null,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.FillBounds
+                    )
+
+                    // CONTENT - image ke upar
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 24.dp)
+                            .padding(top = 32.dp, bottom = 40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Subscription Activated",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF2C2C2C),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Your creativity just got an upgrade! Enjoy full access.",
+                            fontSize = 12.sp,
+                            color = Color(0xFF9B9B9B),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 18.sp
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = {
+                                showSuccessSheet = false
+                                onAddPhotoClick()
+                            },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(50),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(Color(0xFFAADA56), Color(0xFF799F35))
+                                        ),
+                                        RoundedCornerShape(50)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Start Generating",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }    }
 
     @Composable
     fun SubscriptionCard(

@@ -1,6 +1,11 @@
 package com.webscare.interiorismai.ui.BottomBarScreen
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
@@ -44,6 +49,7 @@ import androidx.compose.ui.draw.innerShadow
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -83,8 +89,10 @@ import com.webscare.interiorismai.utils.GenerationStatus
 import com.webscare.interiorismai.utils.getPlatformContext
 
 @Composable
-fun BaseBottomBarScreen(rootNavController: NavHostController,
-                         authViewModel: AuthViewModel) {
+fun BaseBottomBarScreen(
+    rootNavController: NavHostController,
+    authViewModel: AuthViewModel
+) {
 
 
     val navController = rememberNavController()
@@ -105,8 +113,9 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
     val currentTaskId = remember(tasksStatus) { tasksStatus.keys.firstOrNull() ?: "" }
     val currentStatus = tasksStatus[currentTaskId] ?: GenerationStatus.IDLE
     var showTapToView by remember { mutableStateOf<String?>(null) }
-    val displayProgress = if (currentStatus == GenerationStatus.SUCCESS) 1f else (tasksProgress[currentTaskId] ?: 0f)
-        var lastTaskId by remember { mutableStateOf<String?>(null) }
+    val displayProgress =
+        if (currentStatus == GenerationStatus.SUCCESS) 1f else (tasksProgress[currentTaskId] ?: 0f)
+    var lastTaskId by remember { mutableStateOf<String?>(null) }
     val activeCount = tasksStatus.count { it.value == GenerationStatus.RUNNING }
 
 
@@ -120,7 +129,8 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
         val index = getSelectedTabIndex(currentDestination?.route)
         SlippyOptions.currentPage.value = index
     }
-    val isRunning = shouldShowBottomBar && currentTaskId.isNotEmpty() && currentStatus != GenerationStatus.IDLE
+    val isRunning =
+        shouldShowBottomBar && currentTaskId.isNotEmpty() && currentStatus != GenerationStatus.IDLE
     val waitingMessages = listOf(
         "Almost there..",
         "Finalizing details..",
@@ -149,6 +159,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                 else -> "Almost there.."
             }
         }
+
         else -> ""
     }
     val platformContext = getPlatformContext()
@@ -202,7 +213,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                             }
                         },
 
-                    ),
+                        ),
                     SlippyTab(
                         name = stringResource(Res.string.tabFourProfile),
                         icon = painterResource(Res.drawable.profileiconnew),
@@ -222,30 +233,30 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                         .fillMaxWidth()
                         .background(bottomBarBack)
                 ) {
-                SlippyBottomBar(
-                    bar = SlippyBar(
-                        barStyle = SlippyBarStyle(backgroundColor = bottomBarBack),
-                        textStyle = SlippyTextStyle(
-                            enabledTextColor = selectedNavItem,
-                            disabledTextColor = unselectedNavItem,
-                            textSize = 12.sp
+                    SlippyBottomBar(
+                        bar = SlippyBar(
+                            barStyle = SlippyBarStyle(backgroundColor = bottomBarBack),
+                            textStyle = SlippyTextStyle(
+                                enabledTextColor = selectedNavItem,
+                                disabledTextColor = unselectedNavItem,
+                                textSize = 12.sp
+                            ),
+                            iconStyle = SlippyIconStyle(
+                                enabledIconColor = selectedNavItem,
+                                disabledIconColor = unselectedNavItem
+                            ),
+                            startIndex = getSelectedTabIndex(currentDestination.route),
+                            badgeStyle = SlippyBadgeStyle(
+                                backgroundColor = Color(0xFFCCE9A2),
+                                contentColor = Color.White
+                            )
                         ),
-                        iconStyle = SlippyIconStyle(
-                            enabledIconColor = selectedNavItem,
-                            disabledIconColor = unselectedNavItem
-                        ),
-                        startIndex = getSelectedTabIndex(currentDestination.route),
-                        badgeStyle = SlippyBadgeStyle(
-                            backgroundColor = Color(0xFFCCE9A2),
-                            contentColor = Color.White
-                        )
-                    ),
-                    tabs = tabs,
-                    iconSize = 24.dp,
-                    fabIndex = 2,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-            }
+                        tabs = tabs,
+                        iconSize = 24.dp,
+                        fabIndex = 2,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
             }
         },
         floatingActionButton = {
@@ -299,10 +310,8 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                 startDestination = Routes.Create,
                 modifier = Modifier
                     .background(Color.White)
-                    .padding(bottom = padding.calculateBottomPadding())
-
-            )
-            {
+                    .padding(bottom = padding.calculateBottomPadding() + if (isRunning) 60.dp else 0.dp)
+            ) {
                 // Bottom bar destinations
                 composable<Routes.Create> {
                     CreateScreen(
@@ -313,6 +322,9 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                         onAddPhotoClick = {
                             roomViewModel.prepareForNewGeneration()
                             showGallery = true
+                        },
+                        onNavigateToAboutToGenerate = {
+                            navController.navigate(Routes.AbtToGenerate)
                         },
                         onRoomClick = { room ->
 
@@ -380,12 +392,20 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
 
                 composable<Routes.AddScreen> {
                     BaseGenerateScreen(
-
                         roomViewModel,
                         endToNext = {
-                            navController.navigate(Routes.AbtToGenerate)
+                            val isEdit = roomViewModel.state.value.isEditMode
+                            if (isEdit) {
+                                roomViewModel.onRoomEvent(RoomEvent.SetEditMode(false))
+                                navController.navigate(Routes.AbtToGenerate) {
+                                    popUpTo(Routes.AddScreen) { inclusive = true }
+                                }
+                            } else {
+                                navController.navigate(Routes.AbtToGenerate)
+                            }
                         },
                         onCloseClick = {
+                            roomViewModel.onRoomEvent(RoomEvent.SetEditMode(false))
                             roomViewModel.saveOrUpdateDraft()
                             navController.popBackStack()
                         }
@@ -406,6 +426,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                                 state.generatedImagesEntity.firstOrNull { it.bundleId == selectedBundleId }
                                     ?: state.generatedImagesEntity.firstOrNull()
                             }
+
                             args.entityId != -1L -> dbImages.find { it.id == args.entityId }
                             else -> null
                         }
@@ -424,8 +445,8 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                                 onClick = { navController.popBackStack() }
                             )
                         }
+
                         entity != null -> {
-                            // Bundle ya DB record se sahi image path uthana
                             val imagePath = entity.localPaths.getOrNull(selectedIndex) ?: ""
 
                             CreateEditScreen(
@@ -481,6 +502,22 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                         },
                         onSubscriptionClick = {
                             navController.navigate(Routes.Subscription)
+                        },
+                        onEditType = {
+                            roomViewModel.onRoomEvent(RoomEvent.SetEditMode(true))
+                            roomViewModel.onRoomEvent(RoomEvent.GoToPage(1))
+                            navController.navigate(Routes.AddScreen)
+                        },
+
+                        onEditStyle = {
+                            roomViewModel.onRoomEvent(RoomEvent.SetEditMode(true))
+                            roomViewModel.onRoomEvent(RoomEvent.GoToPage(2))
+                            navController.navigate(Routes.AddScreen)
+                        },
+                        onEditPalette = {
+                            roomViewModel.onRoomEvent(RoomEvent.SetEditMode(true))
+                            roomViewModel.onRoomEvent(RoomEvent.GoToPage(3))
+                            navController.navigate(Routes.AddScreen)
                         }
                     )
                 }
@@ -495,6 +532,10 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                             rootNavController.navigate(Routes.Login) {
                                 launchSingleTop = true
                             }
+                        },
+                        onAddPhotoClick = {
+                            navController.popBackStack()
+                            showGallery = true
                         }
                     )
                 }
@@ -595,8 +636,9 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                 )
                 {
                     BadgedBox(
-                                badge = {
-                            val activeCount = tasksStatus.count { it.value == GenerationStatus.RUNNING }
+                        badge = {
+                            val activeCount =
+                                tasksStatus.count { it.value == GenerationStatus.RUNNING }
                             if (activeCount > 0) {
                                 Badge(
                                     containerColor = Color(0xFFCCE9A2),
@@ -612,7 +654,7 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                             }
                         },
 
-                    ) {
+                        ) {
                         Box(
                             modifier = Modifier.size(36.dp).clip(CircleShape)
                                 .background(Color(0xFFF2F2F1)), contentAlignment = Alignment.Center
@@ -654,11 +696,25 @@ fun BaseBottomBarScreen(rootNavController: NavHostController,
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
+                    val infiniteTransition = rememberInfiniteTransition()
+                    val blinkAlpha by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 0.2f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(durationMillis = 800),
+                            repeatMode = RepeatMode.Reverse
+                        )
+                    )
+
+                    val textAlpha =
+                        if (currentStatus == GenerationStatus.RUNNING) blinkAlpha else 1f
+
                     Text(
                         text = loadingText,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF2C2C2C)
+                        color = Color(0xFF2C2C2C),
+                        modifier = Modifier.graphicsLayer { alpha = textAlpha }
                     )
 
                     Spacer(modifier = Modifier.weight(1f))

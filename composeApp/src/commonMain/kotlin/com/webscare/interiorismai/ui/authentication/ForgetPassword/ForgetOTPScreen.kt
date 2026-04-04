@@ -66,7 +66,9 @@ fun ForgetOTPScreen(
                 is CommonUiEvent.ShowSuccess -> {
                     snackBarState.showSuccess(event.message)
                 }
+                else -> {}
             }
+
         }
     }
 

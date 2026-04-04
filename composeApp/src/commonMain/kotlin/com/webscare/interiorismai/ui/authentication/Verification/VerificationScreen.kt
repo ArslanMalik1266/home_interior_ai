@@ -73,6 +73,7 @@ fun VerificationScreen(
                 is CommonUiEvent.ShowSuccess -> {
                     snackBarState.showSuccess(event.message)
                 }
+                else -> {}
             }
         }
     }

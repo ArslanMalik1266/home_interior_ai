@@ -148,7 +148,8 @@ fun SlippyBottomBar(
                 RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
             )
             .fillMaxWidth()
-            .height(intrinsicSize = IntrinsicSize.Max),
+            .height(intrinsicSize = IntrinsicSize.Max)
+            .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically
     ) {

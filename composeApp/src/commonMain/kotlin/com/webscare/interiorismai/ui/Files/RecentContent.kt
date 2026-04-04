@@ -128,7 +128,7 @@ fun RecentContent(
                                 .padding(8.dp)
                         ) {
                             Text(
-                                text = "${bundle.localPaths.size} Pics",
+                                text = "${bundle.localPaths.size} ${if (bundle.localPaths.size == 1) "Variation" else "Variations"}",
                                 color = Color.White,
                                 fontSize = 10.sp,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)

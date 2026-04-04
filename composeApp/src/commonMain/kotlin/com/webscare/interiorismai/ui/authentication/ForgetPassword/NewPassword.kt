@@ -77,6 +77,7 @@ fun NewPasswordScreen(
                 is CommonUiEvent.ShowSuccess -> {
                     snackBarState.showSuccess(event.message)
                 }
+                else -> {}
             }
         }
     }

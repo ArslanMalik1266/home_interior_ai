@@ -215,8 +215,6 @@ class RoomsViewModel(
     @OptIn(ExperimentalTime::class, ExperimentalEncodingApi::class)
     fun onRoomEvent(event: RoomEvent) {
         when (event) {
-
-            // Filtering and search events (keep as-is)
             is RoomEvent.OnSearchQueryChange -> {
                 _state.value = _state.value.copy(searchQuery = event.query)
                 applyFiltersAndSearch()
@@ -240,7 +238,13 @@ class RoomsViewModel(
                 }
             }
 
+            is RoomEvent.GoToPage -> {
+                _state.update { it.copy(currentPage = event.page) }
+            }
 
+            is RoomEvent.SetEditMode -> {
+                _state.update { it.copy(isEditMode = event.isEdit) }
+            }
             is RoomEvent.OnApplyFilters -> {
                 val tempFilter = _state.value.tempFilterState
                 val count = calculateFilterCount(tempFilter)
@@ -850,13 +854,19 @@ No structural changes to walls, ceiling, floor, windows, or doors. No bare or co
             is RoomEvent.OnPurchasePlan -> {
                 println("🟡 OnPurchasePlan: productId=${event.productId}")
 
-                val email = authViewModel.state.value.email ?: ""
-                if (email.isBlank()) {
+                // ✅ EMAIL ki jagah LOGIN flag check karo
+                val isLoggedIn = authViewModel.settings.getBoolean(
+                    com.webscare.interiorismai.utils.Constants.LOGIN,
+                    false
+                )
+
+                if (!isLoggedIn) {
                     _state.update { it.copy(navigateToLogin = true) }
                     return
                 }
+
                 _state.update { it.copy(isPurchasing = true, purchaseError = null) }
-                billingHelper?.launchPurchase(event.productId)  // ✅ Play Store sheet
+                billingHelper?.launchPurchase(event.productId)
             }
             RoomEvent.ClearPurchaseState -> {
                 _state.update { it.copy(purchaseSuccess = null, purchaseError = null) }

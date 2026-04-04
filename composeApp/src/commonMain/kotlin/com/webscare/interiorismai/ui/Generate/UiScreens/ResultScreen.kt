@@ -48,7 +48,7 @@ fun ResultScreen(
     isFetchingImages: Boolean = false,
     imageEtaSeconds: List<Int> = emptyList(),
     generatedCount: Int = 3,
-    onImageClick: (Int) -> Unit
+    onImageClick: (Int) -> Unit,
 ) {
     val tasksProgress by viewModel.tasksProgress.collectAsState()
     val state by viewModel.state.collectAsState()
@@ -74,7 +74,6 @@ fun ResultScreen(
             .statusBarsPadding()
             .background(Color.White)
     ) {
-        // ✅ Wahi Purani TopBar jo aapki app mein hai
         Row(
             modifier = Modifier
                 .fillMaxWidth()

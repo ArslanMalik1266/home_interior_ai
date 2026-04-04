@@ -45,6 +45,10 @@ fun LoginRoot(authViewModel: AuthViewModel = koinViewModel(), navController: Nav
     LoginScreen(navController, authViewModel.uiEvent, state, authViewModel::onRegisterFormEvent,onBackClick)
 }
 
+fun isValidEmail(email: String): Boolean {
+    return email.endsWith("@gmail.com") && email.length > "@gmail.com".length
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
@@ -54,6 +58,8 @@ fun LoginScreen(
     onLoginEvent: (event: RegisterEvent) -> Unit,
     onBackClick: (() -> Unit)? = null
 ) {
+    val isEmailValid = isValidEmail(state.email)
+
     val snackBarState = rememberCustomSnackbarState()
     LaunchedEffect(Unit) {
         uiEvent.collect { event ->
@@ -71,6 +77,7 @@ fun LoginScreen(
                 is CommonUiEvent.ShowSuccess -> {
                     snackBarState.showSuccess(event.message)
                 }
+                else -> {}
             }
         }
     }
@@ -153,19 +160,21 @@ fun LoginScreen(
                     println("DEBUG_LOGIN_BTN: Button Clicked! Email = ${state.email}")
                     onLoginEvent(RegisterEvent.Login)
                 },
-                enabled = true,
+                enabled = isEmailValid,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = green_btn
+                    containerColor = if (isEmailValid) green_btn else green_btn.copy(alpha = 0.4f),
+                    disabledContainerColor = green_btn.copy(alpha = 0.4f)
                 )
             ) {
                 Text(
                     text = "Login",
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isEmailValid) Color.White else Color.White.copy(alpha = 0.6f)
                 )
             }
 

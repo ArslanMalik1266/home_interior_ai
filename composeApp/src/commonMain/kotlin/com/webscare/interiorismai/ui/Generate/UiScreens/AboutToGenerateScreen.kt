@@ -37,7 +37,10 @@ fun AboutToGenerateScreen(
     authViewModel: AuthViewModel,
     onCloseClick: () -> Unit,
     onResult: () -> Unit,
-    onSubscriptionClick: () -> Unit
+    onSubscriptionClick: () -> Unit,
+    onEditType: () -> Unit = {},
+    onEditStyle: () -> Unit = {},
+    onEditPalette: () -> Unit = {}
 ) {
     val state by roomsViewModel.state.collectAsState()
     val authState by authViewModel.state.collectAsState()
@@ -89,6 +92,7 @@ fun AboutToGenerateScreen(
                 label = "Type",
                 value = selectedType,
                 borderColor = selectedBorderColor,
+                onEditClick = onEditType,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
@@ -100,6 +104,7 @@ fun AboutToGenerateScreen(
                 label = "Style",
                 value = selectedStyle,
                 borderColor = borderColor,
+                onEditClick = onEditStyle,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
@@ -111,6 +116,7 @@ fun AboutToGenerateScreen(
                 ColorPaletteCard(
                     borderColor = Color(0xFFCBE0A7),
                     paletteColors = palette.colors,
+                    onEditClick = onEditPalette,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp)
@@ -298,6 +304,7 @@ private fun SelectionCard(
     label: String,
     value: String,
     borderColor: Color,
+    onEditClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = Color(0xFFFFFFFF).copy(alpha = 0.57f)
@@ -339,6 +346,7 @@ private fun SelectionCard(
             modifier = Modifier
                 .size(22.dp)
                 .align(Alignment.CenterEnd)
+                .clickable { onEditClick() }
         )
     }
 }
@@ -347,7 +355,8 @@ private fun SelectionCard(
 private fun ColorPaletteCard(
     borderColor: Color,
     paletteColors: List<Color>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onEditClick: () -> Unit = {},
 ) {
     val backgroundColor = Color(0xFFFFFFFF).copy(alpha = 0.57f)
     val lightGrayText = Color(0xFF90918F)
@@ -396,6 +405,7 @@ private fun ColorPaletteCard(
             contentDescription = "Edit",
             tint = editIconColor,
             modifier = Modifier.size(22.dp).align(Alignment.CenterEnd)
+                .clickable { onEditClick() }
         )
     }
 }
